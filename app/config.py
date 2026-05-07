@@ -23,11 +23,11 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("DATABASE_URL", "MYSQL_URL", "MYSQL_PRIVATE_URL"),
     )
-    mysql_host: str = Field(default="127.0.0.1", validation_alias=AliasChoices("MYSQL_HOST", "MYSQLHOST"))
-    mysql_port: int = Field(default=3306, validation_alias=AliasChoices("MYSQL_PORT", "MYSQLPORT"))
-    mysql_user: str = Field(default="root", validation_alias=AliasChoices("MYSQL_USER", "MYSQLUSER"))
-    mysql_password: str = Field(default="password", validation_alias=AliasChoices("MYSQL_PASSWORD", "MYSQLPASSWORD"))
-    mysql_database: str = Field(default="torqly_db", validation_alias=AliasChoices("MYSQL_DATABASE", "MYSQLDATABASE"))
+    mysql_host: str = "127.0.0.1"
+    mysql_port: int = 3306
+    mysql_user: str = "root"
+    mysql_password: str = "password"
+    mysql_database: str = "torqly_db"
 
     bootstrap_admin_on_startup: bool = False
     default_admin_name: str = "Administrador"
