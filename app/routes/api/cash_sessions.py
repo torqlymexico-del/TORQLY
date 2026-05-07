@@ -1,7 +1,9 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -70,7 +72,9 @@ class MovementOut(BaseModel):
     amount: Decimal
     description: str | None = None
     is_void: bool
+    void_reason: str | None = None
     created_by_id: int | None = None
+    created_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 
@@ -133,6 +137,24 @@ def close_cash_session(
         return SessionOut.model_validate(cs)
     except ServiceError as exc:
         raise_api_error(exc)
+
+
+@router.get("/{session_id}/movements", response_model=list[MovementOut])
+def get_session_movements(
+    session_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR))],
+):
+    company_id = current_company_id(current_user)
+    cs = db.scalar(select(CashSession).where(CashSession.id == session_id, CashSession.company_id == company_id))
+    if not cs:
+        raise_api_error(ServiceError("Sesión no encontrada."))
+    movements = list(db.scalars(
+        select(CashMovement)
+        .where(CashMovement.session_id == session_id)
+        .order_by(CashMovement.id.desc())
+    ).all())
+    return [MovementOut.model_validate(m) for m in movements]
 
 
 @router.post("/{session_id}/movements", response_model=MovementOut)
