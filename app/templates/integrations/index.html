@@ -1,0 +1,186 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Configuracion</span>
+            <h3>Cuentas conectadas</h3>
+        </div>
+        <div class="header-actions">
+            <a class="btn btn-outline" href="/settings/integrations">Todas</a>
+            <a class="btn btn-outline" href="/settings/integrations/whatsapp">WhatsApp</a>
+            <a class="btn btn-outline" href="/settings/integrations/google">Google</a>
+            <a class="btn btn-outline" href="/settings/integrations/clickup">ClickUp</a>
+            <a class="btn btn-outline" href="/settings/integrations/meta">Meta</a>
+        </div>
+    </div>
+    <p class="muted-copy">Los secretos no se muestran completos. Si dejas vacios los campos sensibles al editar, se conserva el valor anterior.</p>
+</section>
+
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edicion' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar integracion' if selected else 'Nueva integracion' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/settings/integrations" class="btn btn-outline">Nueva</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/settings/integrations/' ~ selected.id ~ '/edit' if selected else '/settings/integrations' }}" class="stack-form">
+            <div class="grid-3">
+                <label>
+                    <span>Proveedor</span>
+                    <select name="provider" {% if selected %}disabled{% endif %}>
+                        {% for provider in provider_values %}
+                        <option value="{{ provider }}" {% if selected and selected.provider == provider %}selected{% elif not selected and provider_group == provider %}selected{% endif %}>{{ provider }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if selected %}
+                    <input type="hidden" name="provider" value="{{ selected.provider }}">
+                    {% endif %}
+                </label>
+                <label><span>Nombre</span><input type="text" name="name" value="{{ selected.name if selected else '' }}" required></label>
+                <label>
+                    <span>Estado</span>
+                    <select name="status">
+                        {% for item in status_values %}
+                        <option value="{{ item }}" {% if selected and selected.status == item %}selected{% elif not selected and item == 'active' %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <label><span>Descripcion</span><input type="text" name="description" value="{{ selected.description if selected else '' }}"></label>
+            <label class="checkbox-row">
+                <span>Marcar como default para este proveedor</span>
+                <input type="checkbox" name="is_default" {% if selected and selected.is_default %}checked{% endif %}>
+            </label>
+
+            <section class="panel nested-panel">
+                <div class="panel-header"><h4>WhatsApp / Meta</h4></div>
+                <div class="grid-3">
+                    <label><span>Access token</span><input type="password" name="access_token" placeholder="Se cifra antes de guardar"></label>
+                    <label><span>Phone number ID</span><input type="text" name="phone_number_id" value="{{ selected.config_json.phone_number_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Business account ID</span><input type="text" name="business_account_id" value="{{ selected.config_json.business_account_id if selected and selected.config_json else '' }}"></label>
+                </div>
+                <div class="grid-2">
+                    <label><span>API version</span><input type="text" name="api_version" value="{{ selected.config_json.api_version if selected and selected.config_json else 'v20.0' }}"></label>
+                    <label><span>Verify token / webhook secret</span><input type="password" name="verify_token" placeholder="Opcional al editar"></label>
+                </div>
+                <label><span>Webhook secret</span><input type="password" name="webhook_secret" placeholder="Opcional al editar"></label>
+            </section>
+
+            <section class="panel nested-panel">
+                <div class="panel-header"><h4>Google Calendar / Sheets</h4></div>
+                <div class="grid-3">
+                    <label>
+                        <span>Tipo de autenticacion</span>
+                        <select name="auth_type">
+                            <option value="service_account" {% if selected and selected.config_json and selected.config_json.auth_type == 'service_account' %}selected{% endif %}>service_account</option>
+                            <option value="oauth" {% if selected and selected.config_json and selected.config_json.auth_type == 'oauth' %}selected{% endif %}>oauth</option>
+                        </select>
+                    </label>
+                    <label><span>Calendar ID</span><input type="text" name="calendar_id" value="{{ selected.config_json.calendar_id if selected and selected.config_json else 'primary' }}"></label>
+                    <label><span>Spreadsheet ID</span><input type="text" name="spreadsheet_id" value="{{ selected.config_json.spreadsheet_id if selected and selected.config_json else '' }}"></label>
+                </div>
+                <label><span>Credentials JSON</span><textarea name="credentials_json" rows="4" placeholder='{"type":"service_account", ...}'></textarea></label>
+                <div class="grid-3">
+                    <label><span>Client ID</span><input type="text" name="client_id"></label>
+                    <label><span>Client secret</span><input type="password" name="client_secret"></label>
+                    <label><span>Refresh token</span><input type="password" name="refresh_token"></label>
+                </div>
+                <label><span>Token URI</span><input type="text" name="token_uri" value="{{ selected.config_json.token_uri if selected and selected.config_json else 'https://oauth2.googleapis.com/token' }}"></label>
+            </section>
+
+            <section class="panel nested-panel">
+                <div class="panel-header"><h4>ClickUp</h4></div>
+                <div class="grid-3">
+                    <label><span>API token</span><input type="password" name="api_token"></label>
+                    <label><span>Team ID</span><input type="text" name="team_id" value="{{ selected.config_json.team_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Space ID</span><input type="text" name="space_id" value="{{ selected.config_json.space_id if selected and selected.config_json else '' }}"></label>
+                </div>
+                <div class="grid-3">
+                    <label><span>Folder ID</span><input type="text" name="folder_id" value="{{ selected.config_json.folder_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>List ID</span><input type="text" name="list_id" value="{{ selected.config_json.list_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Webhook secret</span><input type="password" name="webhook_secret"></label>
+                </div>
+            </section>
+
+            <section class="panel nested-panel">
+                <div class="panel-header"><h4>Meta Business / Custom</h4></div>
+                <div class="grid-3">
+                    <label><span>Business ID</span><input type="text" name="business_id" value="{{ selected.config_json.business_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>App ID</span><input type="text" name="app_id" value="{{ selected.config_json.app_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Ad account ID</span><input type="text" name="ad_account_id" value="{{ selected.config_json.ad_account_id if selected and selected.config_json else '' }}"></label>
+                </div>
+                <div class="grid-3">
+                    <label><span>Page ID</span><input type="text" name="page_id" value="{{ selected.config_json.page_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Instagram business ID</span><input type="text" name="instagram_business_id" value="{{ selected.config_json.instagram_business_id if selected and selected.config_json else '' }}"></label>
+                    <label><span>Custom endpoint</span><input type="text" name="custom_endpoint" value="{{ selected.config_json.custom_endpoint if selected and selected.config_json else '' }}"></label>
+                </div>
+            </section>
+
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Guardar integracion' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Estado</span>
+                <h3>Integraciones registradas</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Proveedor</th>
+                        <th>Nombre</th>
+                        <th>Estado</th>
+                        <th>Default</th>
+                        <th>Ult. 4</th>
+                        <th>Ultimo uso</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in account_previews %}
+                    <tr>
+                        <td>{{ item.provider }}</td>
+                        <td>
+                            <strong>{{ item.name }}</strong>
+                            {% if item.last_error %}
+                            <p class="muted-copy">{{ item.last_error }}</p>
+                            {% endif %}
+                        </td>
+                        <td><span class="badge">{{ item.status }}</span></td>
+                        <td>{{ 'Si' if item.is_default else 'No' }}</td>
+                        <td>{{ item.suffix or '----' }}</td>
+                        <td>{{ item.last_used_at.strftime('%d/%m %H:%M') if item.last_used_at else 'Nunca' }}</td>
+                        <td class="actions-cell">
+                            <a href="/settings/integrations?edit={{ item.id }}" class="btn btn-link">Editar</a>
+                            <form method="post" action="/settings/integrations/{{ item.id }}/test">
+                                <button type="submit" class="btn btn-outline">Probar</button>
+                            </form>
+                            <form method="post" action="/settings/integrations/{{ item.id }}/default">
+                                <button type="submit" class="btn btn-outline">Default</button>
+                            </form>
+                            <form method="post" action="/settings/integrations/{{ item.id }}/toggle">
+                                <button type="submit" class="btn btn-outline">Activar/Desactivar</button>
+                            </form>
+                            <form method="post" action="/settings/integrations/{{ item.id }}/disconnect">
+                                <button type="submit" class="btn btn-danger">Desconectar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="empty-state">No hay integraciones registradas para esta empresa.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

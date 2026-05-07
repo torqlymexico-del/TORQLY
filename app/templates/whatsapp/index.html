@@ -1,0 +1,126 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid whatsapp-shell">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Inbox</span>
+                <h3>Conversaciones</h3>
+            </div>
+        </div>
+        <div class="conversation-list">
+            {% for conversation in conversations %}
+            <a href="/whatsapp/conversations?conversation_id={{ conversation.id }}"
+               class="conversation-row {{ 'active' if selected_conversation and selected_conversation.id == conversation.id else '' }}">
+                <div>
+                    <strong>{{ conversation.display_name or conversation.phone }}</strong>
+                    <p>{{ conversation.phone }}</p>
+                </div>
+                <div class="conversation-meta">
+                    <span class="badge">{{ conversation.bot_state }}</span>
+                    <small>{{ conversation.mode }}</small>
+                </div>
+            </a>
+            {% else %}
+            <p class="empty-state">Todavia no hay conversaciones entrantes.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        {% if selected_conversation %}
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Detalle</span>
+                <h3>{{ selected_conversation.display_name or selected_conversation.phone }}</h3>
+            </div>
+            <div class="conversation-meta">
+                <span class="badge">{{ selected_conversation.mode }}</span>
+                <span class="badge">{{ selected_conversation.bot_state }}</span>
+            </div>
+        </div>
+
+        <div class="summary-grid with-bottom-gap">
+            <div class="summary-item">
+                <span>Cliente ligado</span>
+                <strong>{{ selected_conversation.client.name if selected_conversation.client else 'Sin relacionar' }}</strong>
+            </div>
+            <div class="summary-item">
+                <span>Asignado a</span>
+                <strong>{{ selected_conversation.assigned_admin.name if selected_conversation.assigned_admin else 'Nadie' }}</strong>
+            </div>
+        </div>
+
+        <div class="messages-board">
+            {% for message in messages %}
+            <article class="message-bubble {{ 'outbound' if message.direction == 'saliente' else 'inbound' }}">
+                <span>{{ message.direction }}</span>
+                <p>{{ message.content or '[Mensaje sin texto]' }}</p>
+                <small>{{ message.created_at.strftime('%d/%m %H:%M') }}</small>
+            </article>
+            {% else %}
+            <p class="empty-state">No hay mensajes para mostrar.</p>
+            {% endfor %}
+        </div>
+
+        <section class="stack-form with-top-gap">
+            <form method="post" action="/whatsapp/conversations/{{ selected_conversation.id }}/human-mode" class="inline-form">
+                <input type="hidden" name="enabled" value="{{ 'false' if selected_conversation.mode == 'humano' else 'true' }}">
+                <button type="submit" class="btn btn-outline">
+                    {{ 'Desactivar modo humano' if selected_conversation.mode == 'humano' else 'Activar modo humano' }}
+                </button>
+            </form>
+
+            <form method="post" action="/whatsapp/conversations/{{ selected_conversation.id }}/reply" class="stack-form">
+                <label><span>Respuesta manual</span><textarea name="body" rows="3" placeholder="Escribe una respuesta para el cliente"></textarea></label>
+                <button type="submit" class="btn btn-primary">Responder manualmente</button>
+            </form>
+
+            <form method="post" action="/whatsapp/conversations/{{ selected_conversation.id }}/link-client" class="stack-form">
+                <label><span>Relacionar cliente existente</span>
+                    <select name="client_id">
+                        {% for client in clients %}
+                        <option value="{{ client.id }}" {% if selected_conversation.client_id == client.id %}selected{% endif %}>{{ client.name }} - {{ client.phone }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <button type="submit" class="btn btn-outline">Relacionar cliente</button>
+            </form>
+
+            <form method="post" action="/whatsapp/conversations/{{ selected_conversation.id }}/create-appointment" class="stack-form">
+                <div class="panel-header compact">
+                    <div>
+                        <span class="eyebrow">Conversion</span>
+                        <h3>Crear cita desde conversacion</h3>
+                    </div>
+                </div>
+                <div class="grid-2">
+                    <label><span>Servicio</span>
+                        <select name="service_catalog_id">
+                            {% for service in services %}
+                            <option value="{{ service.id }}" {% if selected_payload.get('matched_service_id') == service.id %}selected{% endif %}>{{ service.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label><span>Operador</span>
+                        <select name="operator_id">
+                            <option value="">Sin asignar</option>
+                            {% for operator in operators %}
+                            <option value="{{ operator.id }}">{{ operator.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <div class="grid-2">
+                    <label><span>Fecha</span><input type="date" name="scheduled_date" value="{{ selected_payload.get('requested_date', '') }}" required></label>
+                    <label><span>Hora</span><input type="time" name="scheduled_time" value="{{ selected_payload.get('requested_time', '')[:5] if selected_payload.get('requested_time') else '' }}" required></label>
+                </div>
+                <button type="submit" class="btn btn-primary">Crear cita</button>
+            </form>
+        </section>
+        {% else %}
+        <p class="empty-state">Selecciona una conversacion para ver detalle.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Comando</span>
+                <h3>Bot interno</h3>
+            </div>
+        </div>
+        <form method="post" action="/bot" class="stack-form">
+            <label>
+                <span>Escribe un comando</span>
+                <textarea name="command" rows="4" placeholder="agenda de hoy&#10;ventas de hoy&#10;reasigna el Civic negro a Pedro"></textarea>
+            </label>
+            <button type="submit" class="btn btn-primary">Ejecutar comando</button>
+        </form>
+
+        <div class="summary-grid with-top-gap">
+            <div class="summary-item">
+                <span>Comandos utiles</span>
+                <strong>agenda de hoy</strong>
+                <small class="muted-copy">ventas de hoy, tareas de Juan, comisiones de hoy</small>
+            </div>
+            <div class="summary-item">
+                <span>Acciones</span>
+                <strong>reasigna / termina / crea</strong>
+                <small class="muted-copy">reasigna el Civic negro a Pedro</small>
+            </div>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Ultimo resultado</span>
+                <h3>Respuesta del bot</h3>
+            </div>
+        </div>
+        {% if latest_result %}
+        <div class="receipt-card">
+            <div class="receipt-line">
+                <span>Intent</span>
+                <strong>{{ latest_result.intent }}</strong>
+            </div>
+            <div class="receipt-line">
+                <span>Status</span>
+                <strong>{{ latest_result.status }}</strong>
+            </div>
+            <hr>
+            <div>
+                <strong>Comando</strong>
+                <p class="muted-copy">{{ latest_result.command }}</p>
+            </div>
+            <div>
+                <strong>Respuesta</strong>
+                <pre class="bot-response">{{ latest_result.response }}</pre>
+            </div>
+        </div>
+        {% else %}
+        <p class="empty-state">Todavia no hay comandos ejecutados.</p>
+        {% endif %}
+    </article>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Historial</span>
+            <h3>Mensajes del bot</h3>
+        </div>
+    </div>
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Intent</th>
+                    <th>Status</th>
+                    <th>Comando</th>
+                    <th>Respuesta</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in history %}
+                <tr>
+                    <td>{{ item.created_at.strftime('%d/%m %H:%M') }}</td>
+                    <td>{{ item.intent }}</td>
+                    <td>{{ item.status }}</td>
+                    <td>{{ item.command }}</td>
+                    <td><pre class="inline-pre">{{ item.response }}</pre></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="empty-state">No hay historial de comandos.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

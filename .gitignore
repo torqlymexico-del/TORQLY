@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.env
+*.pyc
+*.pyo
+*.pyd
+*.db
+alembic/versions/__pycache__/
+app/static/uploads/
+logs/
+
+# Frontend
+frontend/node_modules/
+frontend/.vite/
+
+# Build output (se genera en Docker, no hace falta en git)
+app/static/dist/

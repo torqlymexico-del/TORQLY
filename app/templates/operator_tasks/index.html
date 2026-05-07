@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Operacion</span>
+            <h3>Tareas asignadas</h3>
+        </div>
+        <form method="get" action="/operator/tasks" class="inline-form">
+            <input type="date" name="target_date" value="{{ target_date.strftime('%Y-%m-%d') }}">
+            {% if current_user.role in ['admin', 'supervisor'] %}
+            <select name="operator_id">
+                <option value="">Todos los operadores</option>
+                {% for operator in operators %}
+                <option value="{{ operator.id }}" {% if operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="task-board">
+        {% for appointment in tasks %}
+        <article class="task-card">
+            <div class="task-card-head">
+                <div>
+                    <strong>{{ appointment.scheduled_start.strftime('%H:%M') }}</strong>
+                    <p>{{ appointment.client.name }} - {{ appointment.vehicle.brand }} {{ appointment.vehicle.model }}</p>
+                </div>
+                <span class="badge">{{ appointment.status }}</span>
+            </div>
+            <p>{{ appointment.service.name }}{% if appointment.address %} - {{ appointment.address }}{% endif %}</p>
+            <small>{{ appointment.operator.name if appointment.operator else 'Sin operador' }}</small>
+
+            <div class="task-actions">
+                <form method="post" action="/operator/tasks/{{ appointment.id }}/start">
+                    <button type="submit" class="btn btn-outline">Iniciar</button>
+                </form>
+                <form method="post" action="/operator/tasks/{{ appointment.id }}/finish">
+                    <button type="submit" class="btn btn-primary">Terminar</button>
+                </form>
+            </div>
+
+            <form method="post" action="/operator/tasks/{{ appointment.id }}/issue" class="stack-form compact-form">
+                <label><span>Reportar problema</span><input type="text" name="note" placeholder="Falta insumo, retraso, cliente ausente"></label>
+                <button type="submit" class="btn btn-danger">Reportar</button>
+            </form>
+        </article>
+        {% else %}
+        <p class="empty-state">No hay tareas asignadas para la fecha seleccionada.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

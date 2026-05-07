@@ -1,0 +1,50 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Alta</span>
+                <h3>Nueva empresa</h3>
+            </div>
+        </div>
+        <form method="post" action="/settings/companies" class="stack-form">
+            <label><span>Nombre de la empresa</span><input type="text" name="name" required></label>
+            <button type="submit" class="btn btn-primary">Crear empresa</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Registro</span>
+                <h3>Empresas disponibles</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Slug</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in companies %}
+                    <tr>
+                        <td>{{ company.id }}</td>
+                        <td>{{ company.name }}</td>
+                        <td>{{ company.slug }}</td>
+                        <td><span class="badge">{{ company.status }}</span></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-state">No hay empresas registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

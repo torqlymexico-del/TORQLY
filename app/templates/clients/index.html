@@ -1,0 +1,73 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edición' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar cliente' if selected else 'Nuevo cliente' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/panel/clientes" class="btn btn-outline">Nuevo</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/panel/clientes/' ~ selected.id ~ '/editar' if selected else '/panel/clientes' }}" class="stack-form">
+            <div class="grid-2">
+                <label><span>Nombre</span><input type="text" name="name" value="{{ selected.name if selected else '' }}" required></label>
+                <label><span>Teléfono</span><input type="text" name="phone" value="{{ selected.phone if selected else '' }}" required></label>
+            </div>
+            <div class="grid-2">
+                <label><span>Email</span><input type="email" name="email" value="{{ selected.email if selected else '' }}"></label>
+                <label><span>Activo</span>
+                    <select name="is_active">
+                        <option value="true" {% if not selected or selected.is_active %}selected{% endif %}>Sí</option>
+                        <option value="false" {% if selected and not selected.is_active %}selected{% endif %}>No</option>
+                    </select>
+                </label>
+            </div>
+            <label><span>Dirección</span><input type="text" name="address" value="{{ selected.address if selected else '' }}"></label>
+            <label><span>Notas</span><textarea name="notes" rows="3">{{ selected.notes if selected else '' }}</textarea></label>
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Crear cliente' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">CRM ligero</span>
+                <h3>Base de clientes</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                    <tr>
+                        <td>{{ client.name }}</td>
+                        <td>{{ client.phone }}</td>
+                        <td>{{ client.email or '—' }}</td>
+                        <td class="actions-cell">
+                            <a href="/panel/clientes?edit={{ client.id }}" class="btn btn-link">Editar</a>
+                            <form method="post" action="/panel/clientes/{{ client.id }}/eliminar" data-confirm="Enviar a baja lógica este cliente?">
+                                <button type="submit" class="btn btn-danger">Baja lógica</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-state">No hay clientes registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
+

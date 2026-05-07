@@ -1,0 +1,92 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edicion' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar usuario' if selected else 'Nuevo usuario' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/panel/usuarios" class="btn btn-outline">Nuevo</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/panel/usuarios/' ~ selected.id ~ '/editar' if selected else '/panel/usuarios' }}" class="stack-form">
+            <div class="grid-2">
+                <label><span>Nombre</span><input type="text" name="name" value="{{ selected.name if selected else '' }}" required></label>
+                <label><span>Telefono</span><input type="text" name="phone" value="{{ selected.phone if selected else '' }}" required></label>
+            </div>
+            <div class="grid-2">
+                <label><span>Email</span><input type="email" name="email" value="{{ selected.email if selected else '' }}"></label>
+                <label><span>Empresa</span>
+                    <select name="company_id">
+                        {% for company in companies %}
+                        <option value="{{ company.id }}" {% if selected and selected.company_id == company.id %}selected{% endif %}>{{ company.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="grid-2">
+                <label><span>Rol</span>
+                    <select name="role" required>
+                        {% for role in user_roles %}
+                        <option value="{{ role }}" {% if selected and selected.role == role %}selected{% endif %}>{{ role }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <label><span>ClickUp user ID</span><input type="text" name="clickup_user_id" value="{{ selected.clickup_user_id if selected else '' }}" placeholder="Opcional para asignacion externa"></label>
+            <div class="grid-3">
+                <label><span>Salario semanal</span><input type="number" step="0.01" name="weekly_salary" value="{{ selected.weekly_salary if selected else '0' }}" required></label>
+                <label><span>% comision</span><input type="number" step="0.01" name="commission_percentage" value="{{ selected.commission_percentage if selected else '0' }}" required></label>
+                <label><span>Activo</span>
+                    <select name="is_active">
+                        <option value="true" {% if not selected or selected.is_active %}selected{% endif %}>Si</option>
+                        <option value="false" {% if selected and not selected.is_active %}selected{% endif %}>No</option>
+                    </select>
+                </label>
+            </div>
+            <label><span>Contrasena {{ '(deja vacio para conservar)' if selected else '' }}</span><input type="password" name="password" {{ '' if selected else 'required' }}></label>
+            <label><span>Notas</span><textarea name="notes" rows="3">{{ selected.notes if selected else '' }}</textarea></label>
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Crear usuario' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Plantilla</span>
+                <h3>Usuarios y roles</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Telefono</th>
+                        <th>ClickUp</th>
+                        <th>Estado</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <td>{{ user.name }}</td>
+                        <td>{{ user.role }}</td>
+                        <td>{{ user.phone }}</td>
+                        <td>{{ user.clickup_user_id or '---' }}</td>
+                        <td><span class="badge {{ 'badge-danger' if not user.is_active else '' }}">{{ 'Activo' if user.is_active else 'Inactivo' }}</span></td>
+                        <td><a href="/panel/usuarios?edit={{ user.id }}" class="btn btn-link">Editar</a></td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="empty-state">No hay usuarios registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

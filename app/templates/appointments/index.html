@@ -1,0 +1,164 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edicion' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar cita' if selected else 'Nueva cita manual' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/panel/citas" class="btn btn-outline">Nueva</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/panel/citas/' ~ selected.id ~ '/editar' if selected else '/panel/citas' }}" class="stack-form">
+            <div class="grid-2">
+                <label><span>Cliente</span>
+                    <select name="client_id" required>
+                        {% for client in clients %}
+                        <option value="{{ client.id }}" {% if selected and selected.client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Vehiculo</span>
+                    <select name="vehicle_id" required>
+                        {% for vehicle in vehicles %}
+                        <option value="{{ vehicle.id }}" {% if selected and selected.vehicle_id == vehicle.id %}selected{% endif %}>{{ vehicle.client.name }} - {{ vehicle.brand }} {{ vehicle.model }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="grid-2">
+                <label><span>Servicio</span>
+                    <select name="service_catalog_id" required>
+                        {% for service in services %}
+                        <option value="{{ service.id }}" {% if selected and selected.service_catalog_id == service.id %}selected{% endif %}>{{ service.name }} - ${{ '%.2f'|format(service.base_price) }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Operador</span>
+                    <select name="operator_id">
+                        <option value="0">Sin asignar</option>
+                        {% for operator in operators %}
+                        <option value="{{ operator.id }}" {% if selected and selected.operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="grid-3">
+                <label><span>Fecha</span><input type="date" name="scheduled_date" value="{{ selected.scheduled_start.strftime('%Y-%m-%d') if selected else '' }}" required></label>
+                <label><span>Hora</span><input type="time" name="scheduled_time" value="{{ selected.scheduled_start.strftime('%H:%M') if selected else '' }}" required></label>
+                <label><span>Precio estimado</span><input type="number" step="0.01" name="estimated_price" value="{{ selected.estimated_price if selected else '' }}"></label>
+            </div>
+            <div class="grid-2">
+                <label><span>Estado</span>
+                    <select name="status">
+                        {% for item in appointment_statuses %}
+                        <option value="{{ item }}" {% if selected and selected.status == item %}selected{% elif not selected and item == 'pendiente' %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Origen</span>
+                    <select name="origin">
+                        {% for item in appointment_origins %}
+                        <option value="{{ item }}" {% if selected and selected.origin == item %}selected{% elif not selected and item == 'manual' %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            {% if can_select_integrations %}
+            <div class="grid-3">
+                <label><span>WhatsApp conectado</span>
+                    <select name="whatsapp_integration_id">
+                        <option value="0">Default / sin cuenta fija</option>
+                        {% for item in whatsapp_integrations %}
+                        <option value="{{ item.id }}" {% if selected and selected.whatsapp_integration_id == item.id %}selected{% elif not selected and item.is_default %}selected{% endif %}>
+                            {{ item.name }}{% if item.is_default %} (default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Google Calendar conectado</span>
+                    <select name="google_calendar_integration_id">
+                        <option value="0">Default / sin cuenta fija</option>
+                        {% for item in google_calendar_integrations %}
+                        <option value="{{ item.id }}" {% if selected and selected.google_calendar_integration_id == item.id %}selected{% elif not selected and item.is_default %}selected{% endif %}>
+                            {{ item.name }}{% if item.is_default %} (default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>ClickUp conectado</span>
+                    <select name="clickup_integration_id">
+                        <option value="0">Default / sin cuenta fija</option>
+                        {% for item in clickup_integrations %}
+                        <option value="{{ item.id }}" {% if selected and selected.clickup_integration_id == item.id %}selected{% elif not selected and item.is_default %}selected{% endif %}>
+                            {{ item.name }}{% if item.is_default %} (default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            {% endif %}
+            <label><span>Direccion (si es a domicilio)</span><input type="text" name="address" value="{{ selected.address if selected else '' }}"></label>
+            <label><span>Notas</span><textarea name="notes" rows="3">{{ selected.notes if selected else '' }}</textarea></label>
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Crear cita' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Agenda viva</span>
+                <h3>Citas registradas</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Cliente</th>
+                        <th>Servicio</th>
+                        <th>Operador</th>
+                        <th>Estado</th>
+                        <th>Cobro</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for appointment in appointments %}
+                    <tr>
+                        <td>{{ appointment.scheduled_start.strftime('%d/%m %H:%M') }}</td>
+                        <td>{{ appointment.client.name }}</td>
+                        <td>{{ appointment.service.name }}</td>
+                        <td>{{ appointment.operator.name if appointment.operator else 'Sin asignar' }}</td>
+                        <td><span class="badge">{{ appointment.status }}</span></td>
+                        <td>
+                            {% if appointment.charge_status == 'pagado' %}
+                            <span class="badge badge-success">Pagado</span>
+                            {% elif appointment.status != 'cancelado' %}
+                            <a href="/pos?appointment_id={{ appointment.id }}" class="btn btn-link">Cobrar</a>
+                            {% else %}
+                            <span class="muted-copy">Cancelada</span>
+                            {% endif %}
+                        </td>
+                        <td class="actions-cell">
+                            <a href="/panel/citas?edit={{ appointment.id }}" class="btn btn-link">Editar</a>
+                            <form method="post" action="/panel/citas/{{ appointment.id }}/cancelar" data-confirm="Cancelar esta cita?">
+                                <button type="submit" class="btn btn-outline">Cancelar</button>
+                            </form>
+                            <form method="post" action="/panel/citas/{{ appointment.id }}/eliminar" data-confirm="Enviar a baja logica esta cita?">
+                                <button type="submit" class="btn btn-danger">Baja logica</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" class="empty-state">No hay citas registradas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

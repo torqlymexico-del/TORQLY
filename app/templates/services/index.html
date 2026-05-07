@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edición' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar servicio' if selected else 'Nuevo servicio' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/panel/servicios" class="btn btn-outline">Nuevo</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/panel/servicios/' ~ selected.id ~ '/editar' if selected else '/panel/servicios' }}" class="stack-form">
+            <div class="grid-2">
+                <label><span>Nombre</span><input type="text" name="name" value="{{ selected.name if selected else '' }}" required></label>
+                <label><span>Tipo</span>
+                    <select name="service_type">
+                        {% for item in service_types %}
+                        <option value="{{ item }}" {% if selected and selected.service_type == item %}selected{% endif %}>{{ item }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+            </div>
+            <div class="grid-3">
+                <label><span>Precio base</span><input type="number" step="0.01" name="base_price" value="{{ selected.base_price if selected else '0' }}" required></label>
+                <label><span>Duración (min)</span><input type="number" name="estimated_duration_minutes" value="{{ selected.estimated_duration_minutes if selected else '60' }}" required></label>
+                <label><span>Activo</span>
+                    <select name="is_active">
+                        <option value="true" {% if not selected or selected.is_active %}selected{% endif %}>Sí</option>
+                        <option value="false" {% if selected and not selected.is_active %}selected{% endif %}>No</option>
+                    </select>
+                </label>
+            </div>
+            <label><span>Descripción</span><textarea name="description" rows="4">{{ selected.description if selected else '' }}</textarea></label>
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Crear servicio' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Catálogo</span>
+                <h3>Servicios disponibles</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo</th>
+                        <th>Precio</th>
+                        <th>Duración</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for service in services %}
+                    <tr>
+                        <td>{{ service.name }}</td>
+                        <td>{{ service.service_type }}</td>
+                        <td>${{ '%.2f'|format(service.base_price) }}</td>
+                        <td>{{ service.estimated_duration_minutes }} min</td>
+                        <td class="actions-cell">
+                            <a href="/panel/servicios?edit={{ service.id }}" class="btn btn-link">Editar</a>
+                            <form method="post" action="/panel/servicios/{{ service.id }}/eliminar" data-confirm="Enviar a baja lógica este servicio?">
+                                <button type="submit" class="btn btn-danger">Baja lógica</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="empty-state">No hay servicios cargados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
+

@@ -1,0 +1,256 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="stats-grid stats-grid-wide">
+    <article class="stat-card stat-dark">
+        <span>Ventas hoy</span>
+        <strong>${{ '%.2f'|format(snapshot.totals.sales_today) }}</strong>
+        <small>Resumen rapido de caja</small>
+    </article>
+    <article class="stat-card">
+        <span>Citas hoy</span>
+        <strong>{{ snapshot.totals.appointments_today }}</strong>
+        <small>Agenda operativa del dia</small>
+    </article>
+    <article class="stat-card">
+        <span>En proceso</span>
+        <strong>{{ snapshot.totals.in_progress_services_today }}</strong>
+        <small>Servicios trabajando ahora</small>
+    </article>
+    <article class="stat-card">
+        <span>Pendientes</span>
+        <strong>{{ snapshot.totals.pending_services_today }}</strong>
+        <small>Citas listas para arrancar</small>
+    </article>
+    <article class="stat-card">
+        <span>Terminados</span>
+        <strong>{{ snapshot.totals.finished_services_today }}</strong>
+        <small>Servicios cerrados hoy</small>
+    </article>
+    <article class="stat-card">
+        <span>Pendientes de cobro</span>
+        <strong>{{ snapshot.totals.pending_charges_today }}</strong>
+        <small>Servicios listos para caja</small>
+    </article>
+    <article class="stat-card">
+        <span>Comisiones del dia</span>
+        <strong>${{ '%.2f'|format(snapshot.totals.commissions_today) }}</strong>
+        <small>Acumulado por operador</small>
+    </article>
+    <article class="stat-card">
+        <span>Alertas de stock</span>
+        <strong>{{ snapshot.low_stock_alerts|length }}</strong>
+        <small>Productos en minimo o por debajo</small>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Hoy</span>
+                <h3>Agenda del dia</h3>
+            </div>
+            <a href="/panel/agenda" class="btn btn-outline">Ver agenda completa</a>
+        </div>
+        <div class="timeline">
+            {% for appointment in snapshot.appointments_today %}
+            <div class="timeline-item">
+                <div class="timeline-time">{{ appointment.scheduled_start.strftime('%H:%M') }}</div>
+                <div>
+                    <strong>{{ appointment.client.name }}</strong>
+                    <p>{{ appointment.vehicle.brand }} {{ appointment.vehicle.model }} · {{ appointment.service.name }}</p>
+                </div>
+                <div class="timeline-meta">
+                    <span class="badge">{{ appointment.status }}</span>
+                    {% if appointment.charge_status != 'pagado' and appointment.status != 'cancelado' and current_user.role in ['admin', 'cashier'] %}
+                    <a href="/pos?appointment_id={{ appointment.id }}" class="btn btn-link">Cobrar</a>
+                    {% endif %}
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay citas programadas para hoy.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel action-panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Acceso rapido</span>
+                <h3>Flujos frecuentes</h3>
+            </div>
+        </div>
+        <div class="quick-actions">
+            {% if current_user.role in ['admin', 'cashier'] %}
+            <a href="/pos" class="quick-action">
+                <strong>Abrir POS</strong>
+                <span>Cobro rapido por cita y extras</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'supervisor', 'cashier'] %}
+            <a href="/panel/agenda" class="quick-action">
+                <strong>Agenda</strong>
+                <span>Vista diaria de citas y operadores</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'supervisor'] %}
+            <a href="/whatsapp/conversations" class="quick-action">
+                <strong>WhatsApp</strong>
+                <span>Conversaciones, modo humano y citas desde chat</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'supervisor', 'cashier'] %}
+            <a href="/reports" class="quick-action">
+                <strong>Reportes</strong>
+                <span>Ventas, servicios, operadores y comisiones</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'supervisor'] %}
+            <a href="/bot" class="quick-action">
+                <strong>Bot interno</strong>
+                <span>Consultas operativas y acciones por comando</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin'] %}
+            <a href="/settings/integrations" class="quick-action">
+                <strong>Integraciones</strong>
+                <span>Cuentas conectadas, defaults y pruebas</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'cashier'] %}
+            <a href="/cash-cuts" class="quick-action">
+                <strong>Cortes</strong>
+                <span>Resumen diario de caja y utilidad</span>
+            </a>
+            {% endif %}
+            {% if current_user.role in ['admin', 'supervisor', 'operator'] %}
+            <a href="/operator/tasks" class="quick-action">
+                <strong>Tareas</strong>
+                <span>Inicio, termino y reportes operativos</span>
+            </a>
+            {% endif %}
+            <a href="/notifications" class="quick-action">
+                <strong>Centro de alertas</strong>
+                <span>Notificaciones internas y pendientes</span>
+            </a>
+        </div>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Operadores</span>
+                <h3>Tareas por operador</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Operador</th>
+                        <th>Total</th>
+                        <th>Pendientes</th>
+                        <th>En proceso</th>
+                        <th>Terminados</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in snapshot.operator_load %}
+                    <tr>
+                        <td>{{ item.operator_name }}</td>
+                        <td>{{ item.total }}</td>
+                        <td>{{ item.pending }}</td>
+                        <td>{{ item.in_progress }}</td>
+                        <td>{{ item.finished }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="empty-state">No hay operadores con tareas hoy.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Alertas</span>
+                <h3>Stock bajo</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for product in snapshot.low_stock_alerts %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ product.stock }}</div>
+                <div>
+                    <strong>{{ product.name }}</strong>
+                    <p>{{ product.category or 'Sin categoria' }} · minimo {{ product.minimum_stock }} {{ product.unit }}</p>
+                </div>
+                <div class="timeline-meta">
+                    <span class="badge badge-danger">stock bajo</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay alertas de stock bajo.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Integraciones</span>
+                <h3>Errores recientes</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for log in snapshot.recent_integration_errors %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ log.provider }}</div>
+                <div>
+                    <strong>{{ log.event_type }}</strong>
+                    <p>{{ log.error_message or 'Sin detalle adicional.' }}</p>
+                </div>
+                <div class="timeline-meta">
+                    <span class="badge badge-danger">{{ log.status }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay errores recientes de integracion.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Interno</span>
+                <h3>Notificaciones recientes</h3>
+            </div>
+            <a href="/notifications" class="btn btn-outline">Ver todas</a>
+        </div>
+        <div class="timeline">
+            {% for notification in recent_notifications %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ notification.created_at.strftime('%H:%M') }}</div>
+                <div>
+                    <strong>{{ notification.title }}</strong>
+                    <p>{{ notification.message }}</p>
+                </div>
+                <div class="timeline-meta">
+                    <span class="badge">{{ notification.type }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay notificaciones por ahora.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}

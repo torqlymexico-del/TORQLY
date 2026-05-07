@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page_title or settings.app_name }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+    <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <div>
+                <div class="brand-block">
+                    <span class="brand-kicker">Sistema operativo</span>
+                    <h1>{{ settings.app_name }}</h1>
+                    <p>Lavado, detallado, agenda y operacion diaria.</p>
+                </div>
+
+                <nav class="menu">
+                    <a href="/" class="{{ 'active' if request.url.path == '/' else '' }}">Dashboard</a>
+                    <a href="/notifications" class="{{ 'active' if '/notifications' in request.url.path else '' }}">Notificaciones</a>
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor', 'cashier'] %}
+                    <a href="/panel/agenda" class="{{ 'active' if '/panel/agenda' in request.url.path else '' }}">Agenda</a>
+                    <a href="/panel/citas" class="{{ 'active' if '/panel/citas' in request.url.path else '' }}">Citas</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'cashier'] %}
+                    <a href="/pos" class="{{ 'active' if request.url.path == '/pos' else '' }}">POS</a>
+                    <a href="/payments" class="{{ 'active' if request.url.path == '/payments' else '' }}">Pagos</a>
+                    <a href="/cash-cuts" class="{{ 'active' if request.url.path == '/cash-cuts' else '' }}">Cortes</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor', 'operator'] %}
+                    <a href="/operator/tasks" class="{{ 'active' if '/operator/tasks' in request.url.path else '' }}">Tareas</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor'] %}
+                    <a href="/whatsapp/conversations" class="{{ 'active' if '/whatsapp/conversations' in request.url.path else '' }}">WhatsApp</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor', 'cashier'] %}
+                    <a href="/reports" class="{{ 'active' if request.url.path == '/reports' else '' }}">Reportes</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor'] %}
+                    <a href="/bot" class="{{ 'active' if request.url.path == '/bot' else '' }}">Bot interno</a>
+                    <a href="/commissions" class="{{ 'active' if request.url.path == '/commissions' else '' }}">Comisiones</a>
+                    <a href="/panel/usuarios" class="{{ 'active' if '/panel/usuarios' in request.url.path else '' }}">Usuarios</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin'] %}
+                    <a href="/settings/companies" class="{{ 'active' if '/settings/companies' in request.url.path else '' }}">Empresas</a>
+                    <a href="/settings/integrations" class="{{ 'active' if '/settings/integrations' in request.url.path else '' }}">Integraciones</a>
+                    {% endif %}
+
+                    {% if current_user and current_user.role in ['admin', 'supervisor', 'cashier'] %}
+                    <a href="/panel/clientes" class="{{ 'active' if '/panel/clientes' in request.url.path else '' }}">Clientes</a>
+                    <a href="/panel/vehiculos" class="{{ 'active' if '/panel/vehiculos' in request.url.path else '' }}">Vehiculos</a>
+                    <a href="/panel/servicios" class="{{ 'active' if '/panel/servicios' in request.url.path else '' }}">Servicios</a>
+                    {% endif %}
+                </nav>
+            </div>
+
+            <div class="sidebar-footer">
+                {% if current_user %}
+                <div class="user-card">
+                    <span>{{ current_user.name }}</span>
+                    <small>{{ current_user.role }}</small>
+                </div>
+                <form method="post" action="/logout">
+                    <button type="submit" class="btn btn-outline btn-block">Cerrar sesion</button>
+                </form>
+                {% endif %}
+            </div>
+        </aside>
+
+        <main class="content">
+            <header class="page-header">
+                <div>
+                    <span class="eyebrow">Operacion</span>
+                    <h2>{{ page_title or settings.app_name }}</h2>
+                </div>
+                <div class="header-actions">
+                    <a class="btn btn-outline" href="/docs">API Docs</a>
+                    <a class="btn btn-outline" href="/notifications">Alertas</a>
+                    {% if current_user and current_user.role in ['admin', 'supervisor'] %}
+                    <a class="btn btn-outline" href="/whatsapp/conversations">Inbox</a>
+                    {% endif %}
+                    {% if current_user and current_user.role in ['admin', 'cashier'] %}
+                    <a class="btn btn-outline" href="/pos">Cobrar</a>
+                    {% endif %}
+                    {% if current_user and current_user.role in ['admin', 'supervisor'] %}
+                    <a class="btn btn-outline" href="/bot">Bot interno</a>
+                    {% endif %}
+                    {% if current_user and current_user.role in ['admin', 'supervisor', 'cashier'] %}
+                    <a class="btn btn-primary" href="/panel/citas">Nueva cita</a>
+                    {% endif %}
+                </div>
+            </header>
+
+            {% if request.query_params.get('message') %}
+            <div class="alert {{ request.query_params.get('level', 'success') }}">
+                {{ request.query_params.get('message') }}
+            </div>
+            {% endif %}
+
+            {% if error %}
+            <div class="alert error">{{ error }}</div>
+            {% endif %}
+
+            {% if warnings %}
+            <section class="warnings-grid">
+                {% for warning in warnings %}
+                <article class="warning-card">
+                    <strong>Integracion en espera</strong>
+                    <p>{{ warning }}</p>
+                </article>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Centro</span>
+            <h3>Notificaciones</h3>
+        </div>
+    </div>
+    <form method="get" action="/notifications" class="stack-form">
+        <div class="grid-3">
+            <label>
+                <span>Tipo</span>
+                <select name="type">
+                    <option value="">Todos</option>
+                    {% for item in notification_types %}
+                    <option value="{{ item }}" {% if filters.type == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Fecha inicial</span>
+                <input type="date" name="date_from" value="{{ filters.date_from.strftime('%Y-%m-%d') if filters.date_from else '' }}">
+            </label>
+            <label>
+                <span>Fecha final</span>
+                <input type="date" name="date_to" value="{{ filters.date_to.strftime('%Y-%m-%d') if filters.date_to else '' }}">
+            </label>
+        </div>
+        <div class="grid-3">
+            {% if current_user.role in ['admin', 'supervisor'] %}
+            <label>
+                <span>Usuario</span>
+                <select name="user_id">
+                    <option value="">Todos</option>
+                    <option value="0" {% if filters.user_id == 0 %}selected{% endif %}>Globales</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if filters.user_id == user.id %}selected{% endif %}>{{ user.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            {% endif %}
+            <label class="checkbox-row">
+                <span>Solo no leidas</span>
+                <input type="checkbox" name="unread_only" value="true" {% if filters.unread_only %}checked{% endif %}>
+            </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+    </form>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Lista</span>
+            <h3>Alertas y eventos</h3>
+        </div>
+    </div>
+    <div class="timeline">
+        {% for notification in notifications %}
+        <div class="timeline-item wide">
+            <div class="timeline-time">{{ notification.created_at.strftime('%d/%m %H:%M') }}</div>
+            <div>
+                <strong>{{ notification.title }}</strong>
+                <p>{{ notification.message }}</p>
+            </div>
+            <div class="timeline-meta">
+                <span class="badge">{{ notification.type }}</span>
+                {% if not notification.is_read %}
+                <form method="post" action="/notifications/{{ notification.id }}/read">
+                    <button type="submit" class="btn btn-link">Marcar leida</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="empty-state">No hay notificaciones para este filtro.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

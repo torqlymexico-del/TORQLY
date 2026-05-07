@@ -1,0 +1,131 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-pos">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">POS</span>
+                <h3>Cobro rapido por cita</h3>
+            </div>
+        </div>
+
+        {% if selected_appointment %}
+        <div class="ticket-header">
+            <div>
+                <strong>{{ selected_appointment.client.name }}</strong>
+                <p>{{ selected_appointment.vehicle.brand }} {{ selected_appointment.vehicle.model }}</p>
+            </div>
+            <div class="ticket-meta">
+                <span>{{ selected_appointment.service.name }}</span>
+                <strong>${{ '%.2f'|format(selected_appointment.estimated_price) }}</strong>
+            </div>
+        </div>
+        <div class="summary-grid">
+            <div class="summary-item">
+                <span>Operador</span>
+                <strong>{{ selected_appointment.operator.name if selected_appointment.operator else 'Sin asignar' }}</strong>
+            </div>
+            <div class="summary-item">
+                <span>Fecha</span>
+                <strong>{{ selected_appointment.scheduled_start.strftime('%d/%m/%Y %H:%M') }}</strong>
+            </div>
+            <div class="summary-item">
+                <span>Estado</span>
+                <strong>{{ selected_appointment.status }}</strong>
+            </div>
+            <div class="summary-item">
+                <span>Cobro</span>
+                <strong>{{ selected_appointment.charge_status }}</strong>
+            </div>
+        </div>
+
+        <form method="post" action="/pos" class="stack-form" id="pos-form">
+            <input type="hidden" name="appointment_id" value="{{ selected_appointment.id }}">
+
+            <section class="panel inset-panel">
+                <div class="panel-header compact">
+                    <div>
+                        <span class="eyebrow">Extras</span>
+                        <h3>Complementos y upsells</h3>
+                    </div>
+                    <button type="button" class="btn btn-outline" data-add-extra>Agregar extra</button>
+                </div>
+                <div class="extra-rows" data-extra-container>
+                    <div class="extra-row">
+                        <input type="text" name="extra_description" placeholder="Descontaminado, aromatizante, lavado motor">
+                        <input type="number" step="0.01" name="extra_quantity" placeholder="1" value="1">
+                        <input type="number" step="0.01" name="extra_unit_price" placeholder="0.00">
+                        <select name="extra_apply_commission">
+                            <option value="true">Comisionable</option>
+                            <option value="false">Sin comision</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <div class="grid-3">
+                <label><span>Descuento</span><input type="number" step="0.01" name="discount_total" value="0"></label>
+                <label><span>Metodo de pago</span>
+                    <select name="payment_method">
+                        {% for method in payment_methods %}
+                        <option value="{{ method }}">{{ method }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Referencia</span><input type="text" name="reference" placeholder="Ultimos 4 digitos o folio"></label>
+            </div>
+            <label><span>Notas</span><textarea name="notes" rows="3" placeholder="Observaciones del cobro o cortesia"></textarea></label>
+            <button type="submit" class="btn btn-primary">Registrar pago</button>
+        </form>
+        {% else %}
+        <p class="empty-state">No hay citas pendientes de cobro.</p>
+        {% endif %}
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Pendientes</span>
+                <h3>Cola de cobro</h3>
+            </div>
+            <a href="/payments" class="btn btn-outline">Ver pagos</a>
+        </div>
+        <div class="timeline">
+            {% for appointment in pending_appointments %}
+            <div class="timeline-item">
+                <div class="timeline-time">{{ appointment.scheduled_start.strftime('%H:%M') }}</div>
+                <div>
+                    <strong>{{ appointment.client.name }}</strong>
+                    <p>{{ appointment.vehicle.brand }} {{ appointment.vehicle.model }} - {{ appointment.service.name }}</p>
+                </div>
+                <a href="/pos?appointment_id={{ appointment.id }}" class="btn btn-link">Cobrar</a>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay servicios listos para caja.</p>
+            {% endfor %}
+        </div>
+
+        <div class="panel-header with-top-gap">
+            <div>
+                <span class="eyebrow">Hoy</span>
+                <h3>Pagos recientes</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for payment in recent_payments %}
+            <div class="timeline-item">
+                <div class="timeline-time">${{ '%.2f'|format(payment.total) }}</div>
+                <div>
+                    <strong>{{ payment.ticket_number }}</strong>
+                    <p>{{ payment.appointment.client.name if payment.appointment and payment.appointment.client else 'Sin cliente' }} - {{ payment.payment_method }}</p>
+                </div>
+                <a href="/payments?payment_id={{ payment.id }}" class="btn btn-link">Ticket</a>
+            </div>
+            {% else %}
+            <p class="empty-state">Todavia no hay pagos registrados hoy.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}
+

@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-pos">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Corte diario</span>
+                <h3>Resumen del {{ target_date.strftime('%d/%m/%Y') }}</h3>
+            </div>
+        </div>
+        <form method="get" action="/cash-cuts" class="inline-form with-bottom-gap">
+            <input type="date" name="target_date" value="{{ target_date.strftime('%Y-%m-%d') }}">
+            <button type="submit" class="btn btn-outline">Cambiar dia</button>
+        </form>
+
+        <div class="stats-grid stats-grid-cut">
+            <article class="stat-card stat-dark"><span>Ventas</span><strong>${{ '%.2f'|format(summary.total_sales) }}</strong></article>
+            <article class="stat-card"><span>Efectivo</span><strong>${{ '%.2f'|format(summary.cash_total) }}</strong></article>
+            <article class="stat-card"><span>Tarjeta</span><strong>${{ '%.2f'|format(summary.card_total) }}</strong></article>
+            <article class="stat-card"><span>Transferencia</span><strong>${{ '%.2f'|format(summary.transfer_total) }}</strong></article>
+            <article class="stat-card"><span>Cortesias</span><strong>${{ '%.2f'|format(summary.courtesy_total) }}</strong></article>
+            <article class="stat-card"><span>Descuentos</span><strong>${{ '%.2f'|format(summary.discounts_total) }}</strong></article>
+            <article class="stat-card"><span>Comisiones</span><strong>${{ '%.2f'|format(summary.commissions_total) }}</strong></article>
+            <article class="stat-card"><span>Utilidad estimada</span><strong>${{ '%.2f'|format(summary.estimated_profit) }}</strong></article>
+        </div>
+
+        <div class="summary-grid with-top-gap">
+            <div class="summary-item"><span>Servicios cobrados</span><strong>{{ summary.services_charged }}</strong></div>
+            <div class="summary-item"><span>Servicios terminados</span><strong>{{ summary.services_completed }}</strong></div>
+            <div class="summary-item"><span>Servicios cancelados</span><strong>{{ summary.services_canceled }}</strong></div>
+            <div class="summary-item"><span>Costo detectado</span><strong>${{ '%.2f'|format(summary.cost_total) }}</strong></div>
+        </div>
+
+        <form method="post" action="/cash-cuts" class="stack-form with-top-gap">
+            <input type="hidden" name="cut_date" value="{{ target_date.strftime('%Y-%m-%d') }}">
+            <label><span>Notas</span><textarea name="notes" rows="3" placeholder="Comentarios del corte"></textarea></label>
+            <div class="inline-form">
+                <button type="submit" class="btn btn-primary">Actualizar corte</button>
+                <button type="submit" class="btn btn-outline" name="close_cut" value="true">Cerrar corte</button>
+            </div>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Historial</span>
+                <h3>Cortes generados</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Ventas</th>
+                        <th>Abrio</th>
+                        <th>Cerro</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cut in cash_cuts %}
+                    <tr>
+                        <td><a href="/cash-cuts?target_date={{ cut.cut_date.strftime('%Y-%m-%d') }}">{{ cut.cut_date.strftime('%d/%m/%Y') }}</a></td>
+                        <td><span class="badge">{{ cut.status }}</span></td>
+                        <td>${{ '%.2f'|format(cut.total_sales) }}</td>
+                        <td>{{ cut.opened_by.name if cut.opened_by else '-' }}</td>
+                        <td>{{ cut.closed_by.name if cut.closed_by else '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="empty-state">No hay cortes generados todavia.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
+

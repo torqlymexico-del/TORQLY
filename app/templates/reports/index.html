@@ -1,0 +1,300 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Analitica</span>
+            <h3>Reportes avanzados</h3>
+        </div>
+    </div>
+    <form method="get" action="/reports" class="stack-form">
+        <div class="grid-3">
+            <label>
+                <span>Fecha inicial</span>
+                <input type="date" name="date_from" value="{{ filters.date_from.strftime('%Y-%m-%d') if filters.date_from else '' }}">
+            </label>
+            <label>
+                <span>Fecha final</span>
+                <input type="date" name="date_to" value="{{ filters.date_to.strftime('%Y-%m-%d') if filters.date_to else '' }}">
+            </label>
+            <label>
+                <span>Metodo de pago</span>
+                <select name="payment_method">
+                    <option value="">Todos</option>
+                    {% for method in payment_methods %}
+                    <option value="{{ method }}" {% if filters.payment_method == method %}selected{% endif %}>{{ method }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <div class="grid-3">
+            <label>
+                <span>Operador</span>
+                <select name="operator_id">
+                    <option value="">Todos</option>
+                    {% for operator in operators %}
+                    <option value="{{ operator.id }}" {% if filters.operator_id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>
+                <span>Servicio</span>
+                <select name="service_catalog_id">
+                    <option value="">Todos</option>
+                    {% for service in services %}
+                    <option value="{{ service.id }}" {% if filters.service_catalog_id == service.id %}selected{% endif %}>{{ service.name }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Aplicar filtros</button>
+    </form>
+</section>
+
+<section class="stats-grid stats-grid-wide">
+    <article class="stat-card stat-dark">
+        <span>Ventas filtradas</span>
+        <strong>${{ '%.2f'|format(sales_data.summary.total_sales) }}</strong>
+        <small>{{ sales_data.summary.transactions }} transacciones</small>
+    </article>
+    <article class="stat-card">
+        <span>Ticket promedio</span>
+        <strong>${{ '%.2f'|format(sales_data.summary.average_ticket) }}</strong>
+        <small>Promedio de cobro</small>
+    </article>
+    <article class="stat-card">
+        <span>Servicios cobrados</span>
+        <strong>{{ daily_data.summary.services_charged }}</strong>
+        <small>En el dia final del rango</small>
+    </article>
+    <article class="stat-card">
+        <span>Cancelados</span>
+        <strong>{{ daily_data.summary.services_canceled }}</strong>
+        <small>En el dia final del rango</small>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Ventas</span>
+                <h3>Por dia</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Ventas</th>
+                        <th>Transacciones</th>
+                        <th>Ticket promedio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in sales_data.sales_by_day %}
+                    <tr>
+                        <td>{{ item.date }}</td>
+                        <td>${{ '%.2f'|format(item.total_sales) }}</td>
+                        <td>{{ item.transactions }}</td>
+                        <td>${{ '%.2f'|format(item.average_ticket) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-state">Sin ventas en el rango.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Cobro</span>
+                <h3>Por metodo</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for item in sales_data.sales_by_payment_method %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ item.payment_method }}</div>
+                <div>
+                    <strong>${{ '%.2f'|format(item.total_sales) }}</strong>
+                    <p>Acumulado en el rango</p>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">No hay pagos para este filtro.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Servicios</span>
+                <h3>Mas vendidos</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Servicio</th>
+                        <th>Ventas</th>
+                        <th>Ingresos</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in services_data.top_services[:10] %}
+                    <tr>
+                        <td>{{ item.service_name }}</td>
+                        <td>{{ item.sold_count }}</td>
+                        <td>${{ '%.2f'|format(item.revenue) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Sin servicios vendidos.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Operadores</span>
+                <h3>Rendimiento</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Operador</th>
+                        <th>Total</th>
+                        <th>Terminados</th>
+                        <th>Comisiones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in operators_data.operators %}
+                    <tr>
+                        <td>{{ item.operator_name }}</td>
+                        <td>{{ item.total if item.total is defined else item.assigned_services }}</td>
+                        <td>{{ item.finished_services }}</td>
+                        <td>${{ '%.2f'|format(item.commissions_total) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-state">Sin operadores para el rango.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Clientes</span>
+                <h3>Frecuentes</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for item in sales_data.frequent_clients[:8] %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ item.visits }}</div>
+                <div>
+                    <strong>{{ item.client_name }}</strong>
+                    <p>${{ '%.2f'|format(item.total_spent) }} acumulados</p>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">Sin clientes frecuentes en el rango.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Comisiones</span>
+                <h3>Por operador</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for item in commissions_data.by_operator[:8] %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ item.commissions_count }}</div>
+                <div>
+                    <strong>{{ item.operator_name }}</strong>
+                    <p>${{ '%.2f'|format(item.total_amount) }} acumulados</p>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">Sin comisiones en el rango.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+
+<section class="split-grid">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Duracion</span>
+                <h3>Promedio por servicio</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Servicio</th>
+                        <th>Promedio minutos</th>
+                        <th>Base</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in services_data.average_duration[:10] %}
+                    <tr>
+                        <td>{{ item.service_name }}</td>
+                        <td>{{ item.average_duration_minutes }}</td>
+                        <td>{{ item.services_count }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="3" class="empty-state">Sin duraciones capturadas.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Horas pico</span>
+                <h3>Carga por horario</h3>
+            </div>
+        </div>
+        <div class="timeline">
+            {% for item in sales_data.peak_hours[:8] %}
+            <div class="timeline-item wide">
+                <div class="timeline-time">{{ item.hour }}</div>
+                <div>
+                    <strong>{{ item.appointments_count }} citas</strong>
+                    <p>Programadas en ese horario</p>
+                </div>
+            </div>
+            {% else %}
+            <p class="empty-state">Sin citas para calcular horas pico.</p>
+            {% endfor %}
+        </div>
+    </article>
+</section>
+{% endblock %}

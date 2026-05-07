@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-pos">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Pagos</span>
+                <h3>Bitacora de cobros</h3>
+            </div>
+            <form method="get" action="/payments" class="inline-form">
+                <input type="date" name="target_date" value="{{ target_date.strftime('%Y-%m-%d') }}">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+            </form>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Ticket</th>
+                        <th>Cliente</th>
+                        <th>Metodo</th>
+                        <th>Total</th>
+                        <th>Hora</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for payment in payments %}
+                    <tr class="{{ 'table-selected' if selected_payment and payment.id == selected_payment.id else '' }}">
+                        <td><a href="/payments?target_date={{ target_date.strftime('%Y-%m-%d') }}&payment_id={{ payment.id }}">{{ payment.ticket_number }}</a></td>
+                        <td>{{ payment.appointment.client.name if payment.appointment and payment.appointment.client else 'Sin cliente' }}</td>
+                        <td>{{ payment.payment_method }}</td>
+                        <td>${{ '%.2f'|format(payment.total) }}</td>
+                        <td>{{ payment.paid_at.strftime('%H:%M') }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="empty-state">No hay pagos para la fecha seleccionada.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Ticket</span>
+                <h3>Resumen de venta</h3>
+            </div>
+            <a href="/pos" class="btn btn-outline">Ir al POS</a>
+        </div>
+        {% if ticket %}
+        <div class="receipt-card">
+            <div class="receipt-line strong-line">
+                <span>{{ ticket.ticket_number }}</span>
+                <span>${{ ticket.total }}</span>
+            </div>
+            <div class="receipt-line"><span>Cliente</span><span>{{ ticket.client or 'Sin cliente' }}</span></div>
+            <div class="receipt-line"><span>Vehiculo</span><span>{{ ticket.vehicle or 'Sin vehiculo' }}</span></div>
+            <div class="receipt-line"><span>Servicio</span><span>{{ ticket.service or 'Sin servicio' }}</span></div>
+            <div class="receipt-line"><span>Operador</span><span>{{ ticket.operator or 'Sin operador' }}</span></div>
+            <div class="receipt-line"><span>Metodo</span><span>{{ ticket.payment_method }}</span></div>
+            <div class="receipt-line"><span>Referencia</span><span>{{ ticket.reference or '-' }}</span></div>
+            <div class="receipt-line"><span>Cajero</span><span>{{ ticket.cashier or '-' }}</span></div>
+            <hr>
+            {% for item in ticket.items %}
+            <div class="receipt-line">
+                <span>{{ item.description }}{% if item.item_type == 'extra' %} (extra){% endif %}</span>
+                <span>${{ item.total }}</span>
+            </div>
+            {% endfor %}
+            <hr>
+            <div class="receipt-line"><span>Subtotal</span><span>${{ ticket.subtotal }}</span></div>
+            <div class="receipt-line"><span>Extras</span><span>${{ ticket.extras_total }}</span></div>
+            <div class="receipt-line"><span>Descuento</span><span>${{ ticket.discount_total }}</span></div>
+            <div class="receipt-line strong-line"><span>Total</span><span>${{ ticket.total }}</span></div>
+        </div>
+        {% else %}
+        <p class="empty-state">Selecciona un pago para ver el ticket.</p>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}
+

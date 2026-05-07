@@ -1,0 +1,83 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-large">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">{{ 'Edición' if selected else 'Alta' }}</span>
+                <h3>{{ 'Editar vehículo' if selected else 'Nuevo vehículo' }}</h3>
+            </div>
+            {% if selected %}
+            <a href="/panel/vehiculos" class="btn btn-outline">Nuevo</a>
+            {% endif %}
+        </div>
+        <form method="post" action="{{ '/panel/vehiculos/' ~ selected.id ~ '/editar' if selected else '/panel/vehiculos' }}" class="stack-form">
+            <div class="grid-2">
+                <label><span>Cliente</span>
+                    <select name="client_id" required>
+                        {% for client in clients %}
+                        <option value="{{ client.id }}" {% if selected and selected.client_id == client.id %}selected{% endif %}>{{ client.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Activo</span>
+                    <select name="is_active">
+                        <option value="true" {% if not selected or selected.is_active %}selected{% endif %}>Sí</option>
+                        <option value="false" {% if selected and not selected.is_active %}selected{% endif %}>No</option>
+                    </select>
+                </label>
+            </div>
+            <div class="grid-3">
+                <label><span>Marca</span><input type="text" name="brand" value="{{ selected.brand if selected else '' }}" required></label>
+                <label><span>Modelo</span><input type="text" name="model" value="{{ selected.model if selected else '' }}" required></label>
+                <label><span>Año</span><input type="number" name="year" value="{{ selected.year if selected and selected.year else '' }}"></label>
+            </div>
+            <div class="grid-2">
+                <label><span>Color</span><input type="text" name="color" value="{{ selected.color if selected else '' }}"></label>
+                <label><span>Placas</span><input type="text" name="plates" value="{{ selected.plates if selected else '' }}"></label>
+            </div>
+            <label><span>Notas</span><textarea name="notes" rows="3">{{ selected.notes if selected else '' }}</textarea></label>
+            <button type="submit" class="btn btn-primary">{{ 'Guardar cambios' if selected else 'Crear vehículo' }}</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Flota</span>
+                <h3>Vehículos vinculados</h3>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Vehículo</th>
+                        <th>Placas</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vehicle in vehicles %}
+                    <tr>
+                        <td>{{ vehicle.client.name }}</td>
+                        <td>{{ vehicle.brand }} {{ vehicle.model }} {{ vehicle.year or '' }}</td>
+                        <td>{{ vehicle.plates or '—' }}</td>
+                        <td class="actions-cell">
+                            <a href="/panel/vehiculos?edit={{ vehicle.id }}" class="btn btn-link">Editar</a>
+                            <form method="post" action="/panel/vehiculos/{{ vehicle.id }}/eliminar" data-confirm="Enviar a baja lógica este vehículo?">
+                                <button type="submit" class="btn btn-danger">Baja lógica</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="4" class="empty-state">No hay vehículos registrados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
+

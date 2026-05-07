@@ -1,0 +1,36 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <span class="eyebrow">Agenda</span>
+            <h3>Vista operativa del dia</h3>
+        </div>
+        <form method="get" action="/panel/agenda" class="inline-form">
+            <input type="date" name="target_date" value="{{ target_date.strftime('%Y-%m-%d') }}">
+            <button type="submit" class="btn btn-primary">Cambiar dia</button>
+        </form>
+    </div>
+    <div class="timeline">
+        {% for appointment in appointments %}
+        <div class="timeline-item wide">
+            <div class="timeline-time">{{ appointment.scheduled_start.strftime('%H:%M') }}</div>
+            <div>
+                <strong>{{ appointment.client.name }} - {{ appointment.vehicle.brand }} {{ appointment.vehicle.model }}</strong>
+                <p>{{ appointment.service.name }}{% if appointment.address %} - {{ appointment.address }}{% endif %}</p>
+            </div>
+            <div class="timeline-meta">
+                <span class="badge">{{ appointment.status }}</span>
+                <small>{{ appointment.operator.name if appointment.operator else 'Sin operador' }}</small>
+                {% if appointment.charge_status != 'pagado' and appointment.status != 'cancelado' %}
+                <a href="/pos?appointment_id={{ appointment.id }}" class="btn btn-link">Cobrar</a>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <p class="empty-state">No hay citas para la fecha seleccionada.</p>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}
+

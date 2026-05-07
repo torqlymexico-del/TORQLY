@@ -1,0 +1,80 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="split-grid split-pos">
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Comisiones</span>
+                <h3>Reporte por operador</h3>
+            </div>
+        </div>
+        <form method="get" action="/commissions" class="stack-form">
+            <div class="grid-3">
+                <label><span>Operador</span>
+                    <select name="operator_id">
+                        {% for operator in operators %}
+                        <option value="{{ operator.id }}" {% if selected_operator and selected_operator.id == operator.id %}selected{% endif %}>{{ operator.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label><span>Periodo</span>
+                    <select name="period">
+                        <option value="daily" {% if period == 'daily' %}selected{% endif %}>Diario</option>
+                        <option value="weekly" {% if period == 'weekly' %}selected{% endif %}>Semanal</option>
+                    </select>
+                </label>
+                <label><span>Fecha referencia</span><input type="date" name="reference_date" value="{{ reference_date.strftime('%Y-%m-%d') }}"></label>
+            </div>
+            <button type="submit" class="btn btn-primary">Actualizar reporte</button>
+        </form>
+
+        <div class="stats-grid stats-grid-cut with-top-gap">
+            {% for item in summaries %}
+            <article class="stat-card">
+                <span>{{ item.period_label }}</span>
+                <strong>${{ '%.2f'|format(item.total_amount) }}</strong>
+                <small>Base: ${{ '%.2f'|format(item.base_amount) }} | Extras: ${{ '%.2f'|format(item.extra_amount) }}</small>
+            </article>
+            {% else %}
+            <p class="empty-state">No hay comisiones para el filtro seleccionado.</p>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <span class="eyebrow">Detalle</span>
+                <h3>{{ selected_operator.name if selected_operator else 'Sin operador' }}</h3>
+            </div>
+            <small>{{ date_from.strftime('%d/%m/%Y') }} - {{ date_to.strftime('%d/%m/%Y') }}</small>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Pago</th>
+                        <th>Base</th>
+                        <th>Extras</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for commission in commission_rows %}
+                    <tr>
+                        <td>{{ commission.period_date.strftime('%d/%m/%Y') if commission.period_date else '-' }}</td>
+                        <td>{{ commission.payment.ticket_number if commission.payment else '-' }}</td>
+                        <td>${{ '%.2f'|format(commission.base_amount) }}</td>
+                        <td>${{ '%.2f'|format(commission.extra_amount) }}</td>
+                        <td>${{ '%.2f'|format(commission.total_amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="empty-state">Sin movimientos en este rango.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
