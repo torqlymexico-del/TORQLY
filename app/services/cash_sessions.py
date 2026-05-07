@@ -60,6 +60,7 @@ def close_session(
     *,
     closing_amount: Decimal,
     notes: str | None,
+    next_opening_amount: Decimal | None,
     actor: User,
     company_id: int | None,
 ) -> CashSession:
@@ -68,7 +69,6 @@ def close_session(
         raise ValidationError("La sesión ya está cerrada.")
 
     now = datetime.now(timezone.utc)
-    # Recalculate totals from orders and movements
     _recalculate_totals(session, cs)
     expected = (cs.opening_amount or Decimal(0)) + (cs.total_sales_cash or Decimal(0)) - (cs.total_expenses or Decimal(0))
     cs.expected_amount = expected
@@ -79,6 +79,19 @@ def close_session(
     cs.status = CashSessionStatus.CLOSED.value
     if notes:
         cs.notes = notes
+    session.flush()
+
+    if next_opening_amount is not None and next_opening_amount >= Decimal(0):
+        new_cs = CashSession(
+            company_id=company_id,
+            opened_by_id=actor.id,
+            opened_at=now,
+            opening_amount=next_opening_amount,
+            status=CashSessionStatus.OPEN.value,
+            notes="Apertura automática tras corte.",
+        )
+        session.add(new_cs)
+
     session.commit()
     session.refresh(cs)
     return cs
@@ -150,27 +163,61 @@ def _get_session(session: Session, session_id: int, *, company_id: int | None) -
     return cs
 
 
+def edit_movement(
+    session: Session,
+    movement_id: int,
+    *,
+    category: str,
+    amount: Decimal,
+    description: str | None,
+    actor: User,
+    company_id: int | None,
+) -> CashMovement:
+    mv = session.get(CashMovement, movement_id)
+    if not mv:
+        raise NotFoundError("Movimiento no encontrado.")
+    cs = _get_session(session, mv.session_id, company_id=company_id)
+    if mv.is_void:
+        raise ValidationError("No se puede editar un movimiento anulado.")
+    if cs.status != CashSessionStatus.OPEN.value:
+        raise ValidationError("No se puede editar movimientos de una sesión cerrada.")
+
+    mv.category = category
+    mv.amount = amount
+    mv.description = description
+    _recalculate_totals(session, cs)
+    session.commit()
+    session.refresh(mv)
+    return mv
+
+
 def _recalculate_totals(session: Session, cs: CashSession) -> None:
     movements = [m for m in cs.movements if not m.is_void]
     income = sum(m.amount for m in movements if m.movement_type == CashMovementType.INCOME.value)
     expense = sum(m.amount for m in movements if m.movement_type == CashMovementType.EXPENSE.value)
     withdrawal = sum(m.amount for m in movements if m.movement_type == CashMovementType.WITHDRAWAL.value)
+    deposit_mov = sum(m.amount for m in movements if m.movement_type == CashMovementType.DEPOSIT.value)
 
-    orders_cash = sum(
-        (o.total for o in cs.orders if o.payment_method == "efectivo" and o.payment_status == "pagado"),
-        Decimal(0),
-    )
-    orders_card = sum(
-        (o.total for o in cs.orders if o.payment_method == "tarjeta" and o.payment_status == "pagado"),
-        Decimal(0),
-    )
-    orders_transfer = sum(
-        (o.total for o in cs.orders if o.payment_method == "transferencia" and o.payment_status == "pagado"),
-        Decimal(0),
-    )
+    paid_orders = [o for o in cs.orders if o.payment_status == "pagado"]
+    credit_orders = [o for o in cs.orders if o.payment_status == "credito"]
+    courtesy_orders = [o for o in cs.orders if o.payment_status == "cortesia"]
 
-    cs.total_sales_cash = orders_cash + income
+    orders_cash = sum((o.total for o in paid_orders if o.payment_method == "efectivo"), Decimal(0))
+    orders_card = sum((o.total for o in paid_orders if o.payment_method == "tarjeta"), Decimal(0))
+    orders_transfer = sum((o.total for o in paid_orders if o.payment_method == "transferencia"), Decimal(0))
+    orders_deposit = sum((o.total for o in paid_orders if o.payment_method == "deposito"), Decimal(0))
+    orders_credit = sum((o.total for o in credit_orders), Decimal(0))
+    orders_courtesy = sum((o.total for o in courtesy_orders), Decimal(0))
+
+    cs.total_sales_cash = orders_cash + income + deposit_mov
     cs.total_sales_card = orders_card
     cs.total_sales_transfer = orders_transfer
-    cs.total_sales = cs.total_sales_cash + cs.total_sales_card + cs.total_sales_transfer
+    cs.total_sales_deposit = orders_deposit
+    cs.total_sales_credit = orders_credit
+    cs.total_sales_courtesy = orders_courtesy
+    cs.courtesy_count = len(courtesy_orders)
+    cs.total_sales = (
+        cs.total_sales_cash + cs.total_sales_card + cs.total_sales_transfer
+        + cs.total_sales_deposit + cs.total_sales_credit
+    )
     cs.total_expenses = expense + withdrawal

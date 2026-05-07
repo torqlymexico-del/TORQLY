@@ -42,6 +42,8 @@ class PaymentMethod(str, Enum):
     CARD = "tarjeta"
     TRANSFER = "transferencia"
     COURTESY = "cortesia"
+    CREDIT = "credito"
+    DEPOSIT = "deposito"
 
 
 class ChargeStatus(str, Enum):
@@ -181,6 +183,7 @@ class CashMovementType(str, Enum):
     INCOME = "ingreso"
     EXPENSE = "egreso"
     WITHDRAWAL = "retiro"
+    DEPOSIT = "deposito"
 
 
 class SalaryFrequency(str, Enum):

@@ -27,6 +27,11 @@ class CashSession(Base, TimestampMixin):
     total_sales_cash: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_sales_card: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_sales_transfer: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    total_sales_credit: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    total_sales_courtesy: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    total_sales_deposit: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
+    courtesy_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    change_given: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_sales: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     total_expenses: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
 

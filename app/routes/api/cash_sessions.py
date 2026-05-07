@@ -13,7 +13,7 @@ from app.enums import UserRole
 from app.models import CashMovement, CashSession, User
 from app.routes.api.common import raise_api_error
 from app.services.cash_sessions import (
-    add_movement, close_session, get_open_session, list_sessions, open_session, void_movement,
+    add_movement, close_session, edit_movement, get_open_session, list_sessions, open_session, void_movement,
 )
 from app.services.exceptions import ServiceError
 
@@ -31,11 +31,18 @@ class OpenSessionIn(BaseModel):
 class CloseSessionIn(BaseModel):
     closing_amount: Decimal
     notes: str | None = None
+    next_opening_amount: Decimal | None = None
 
 
 class MovementIn(BaseModel):
-    movement_type: str  # ingreso | egreso | retiro
+    movement_type: str  # ingreso | egreso | retiro | deposito
     category: str = "general"
+    amount: Decimal
+    description: str | None = None
+
+
+class EditMovementIn(BaseModel):
+    category: str
     amount: Decimal
     description: str | None = None
 
@@ -56,6 +63,11 @@ class SessionOut(BaseModel):
     total_sales_cash: Decimal
     total_sales_card: Decimal
     total_sales_transfer: Decimal
+    total_sales_credit: Decimal = Decimal(0)
+    total_sales_courtesy: Decimal = Decimal(0)
+    total_sales_deposit: Decimal = Decimal(0)
+    courtesy_count: int = 0
+    change_given: Decimal = Decimal(0)
     total_sales: Decimal
     total_expenses: Decimal
     status: str
@@ -131,6 +143,7 @@ def close_cash_session(
             session_id,
             closing_amount=payload.closing_amount,
             notes=payload.notes,
+            next_opening_amount=payload.next_opening_amount,
             actor=current_user,
             company_id=current_company_id(current_user),
         )
@@ -169,6 +182,28 @@ def add_cash_movement(
             db,
             session_id,
             movement_type=payload.movement_type,
+            category=payload.category,
+            amount=payload.amount,
+            description=payload.description,
+            actor=current_user,
+            company_id=current_company_id(current_user),
+        )
+        return MovementOut.model_validate(mv)
+    except ServiceError as exc:
+        raise_api_error(exc)
+
+
+@router.put("/movements/{movement_id}", response_model=MovementOut)
+def edit_cash_movement(
+    movement_id: int,
+    payload: EditMovementIn,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR))],
+):
+    try:
+        mv = edit_movement(
+            db,
+            movement_id,
             category=payload.category,
             amount=payload.amount,
             description=payload.description,
