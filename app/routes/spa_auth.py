@@ -23,9 +23,10 @@ _OAUTH_REDIRECT_COOKIE = "_oauth_redirect"
 
 
 def _build_redirect_uri(request: Request) -> str:
-    """Build the OAuth callback URI from the actual request host."""
-    base = str(request.base_url).rstrip("/")
-    return f"{base}/auth/google/callback"
+    host = request.headers.get("x-forwarded-host") or request.url.hostname or ""
+    is_local = host in ("localhost", "127.0.0.1") or host.startswith("192.168.")
+    scheme = "http" if is_local else "https"
+    return f"{scheme}://{host}/auth/google/callback"
 
 
 def _set_auth_cookie(response: RedirectResponse, user_id: int) -> None:
