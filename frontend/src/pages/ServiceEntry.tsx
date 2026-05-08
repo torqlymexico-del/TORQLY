@@ -132,7 +132,7 @@ function fmt(v: string | number) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ServiceEntry() {
+export default function ServiceEntry({ branch = "local" }: { branch?: string }) {
   const navigate = useNavigate();
 
   const [clients, setClients] = useState<Client[]>([]);
@@ -174,12 +174,13 @@ export default function ServiceEntry() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
+    const p = { branch };
     Promise.all([
-      api.get<Client[]>("/clients/"),
-      api.get<Vehicle[]>("/vehicles/"),
-      api.get<ServiceItem[]>("/services-catalog/"),
-      api.get<Family[]>("/catalog/families"),
-      api.get<Subfamily[]>("/catalog/subfamilies"),
+      api.get<Client[]>("/clients/", { params: p }),
+      api.get<Vehicle[]>("/vehicles/", { params: p }),
+      api.get<ServiceItem[]>("/services-catalog/", { params: p }),
+      api.get<Family[]>("/catalog/families", { params: p }),
+      api.get<Subfamily[]>("/catalog/subfamilies", { params: p }),
       api.get<Operator[]>("/payroll/operators"),
     ]).then(([c, v, s, f, sf, o]) => {
       setClients(c.data);
@@ -189,7 +190,7 @@ export default function ServiceEntry() {
       setSubfamilies(sf.data.filter((x: Subfamily) => x.is_active).sort((a: Subfamily, b: Subfamily) => a.sort_order - b.sort_order));
       setOperators(o.data);
     }).catch(() => {});
-  }, []);
+  }, [branch]);
 
   // ─── Validation ────────────────────────────────────────────────────────────
 
@@ -263,6 +264,7 @@ export default function ServiceEntry() {
           name: newClientName.trim(),
           phone: newClientPhone.trim(),
           email: newClientEmail.trim() || null,
+          branch,
         });
         finalClientId = data.id;
       }
@@ -271,6 +273,7 @@ export default function ServiceEntry() {
       if (vBrand.trim().length > 0) {
         const { data } = await api.post("/vehicles/", {
           client_id: finalClientId,
+          branch,
           brand: vBrand.trim(),
           model: vModel.trim(),
           type: vType,
@@ -284,6 +287,7 @@ export default function ServiceEntry() {
       const { data: order } = await api.post("/orders/", {
         client_id: finalClientId,
         vehicle_id: finalVehicleId,
+        branch,
         items: cart.map(i => ({ catalog_id: i.catalog_id, unit_price: i.unit_price, quantity: i.quantity })),
         notes: orderNotes.trim() || null,
       });
@@ -294,7 +298,7 @@ export default function ServiceEntry() {
         });
       }
 
-      navigate("/orders");
+      navigate(branch === "domicilios" ? "/domicilios/orders" : "/orders");
     } catch (e: any) {
       setSubmitError(e?.response?.data?.detail ?? "Error al crear la orden");
     } finally {

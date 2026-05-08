@@ -72,7 +72,7 @@ export default function App() {
           <Route path="/cash-sessions" element={<Protected><CashSessions branch="local" /></Protected>} />
           <Route path="/credits"       element={<Protected><Credits /></Protected>} />
           <Route path="/payroll"       element={<Protected><Payroll /></Protected>} />
-          <Route path="/alta"          element={<Protected><ServiceEntry /></Protected>} />
+          <Route path="/alta"          element={<Protected><ServiceEntry branch="local" /></Protected>} />
           <Route path="/team"          element={<Protected><Team /></Protected>} />
 
           {/* ── Domicilios branch ── */}
@@ -82,6 +82,7 @@ export default function App() {
           <Route path="/domicilios/clients"      element={<Protected><Clients branch="domicilios" /></Protected>} />
           <Route path="/domicilios/vehicles"     element={<Protected><Vehicles branch="domicilios" /></Protected>} />
           <Route path="/domicilios/services"     element={<Protected><Services branch="domicilios" /></Protected>} />
+          <Route path="/domicilios/alta"         element={<Protected><ServiceEntry branch="domicilios" /></Protected>} />
           <Route path="/domicilios/zones"        element={<Protected><Zones /></Protected>} />
           <Route path="/domicilios/commissions"  element={<Protected><Commissions /></Protected>} />
           <Route path="/domicilios/bot"          element={<Protected><BotConfig /></Protected>} />

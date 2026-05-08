@@ -3,7 +3,7 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Car, Wrench, Wallet, BarChart2, Bot,
   Plug, LogOut, Menu, X, ShoppingBag, BadgeDollarSign, DollarSign,
-  Scissors, MapPin, Bell, Building2, Home, Bike, Settings, Loader2, UserPlus, MessageSquare,
+  Scissors, MapPin, Bell, Building2, Home, Bike, Settings, Loader2, UserPlus, MessageSquare, Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -42,6 +42,7 @@ const NAV: Record<Branch, { to: string; icon: typeof LayoutDashboard; label: str
   ],
   domicilios: [
     { to: "/domicilios",              icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/domicilios/alta",         icon: Zap,             label: "Alta" },
     { to: "/domicilios/orders",       icon: ShoppingBag,     label: "Órdenes" },
     { to: "/domicilios/cash-sessions",icon: Wallet,          label: "Caja" },
     { to: "/domicilios/clients",      icon: Users,           label: "Clientes" },
