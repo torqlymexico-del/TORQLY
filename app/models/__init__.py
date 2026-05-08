@@ -10,6 +10,7 @@ from app.models.commission import Commission
 from app.models.company import Company
 from app.models.external_sync import ExternalSyncRecord
 from app.models.inventory import InventoryMovement, InventoryProduct
+from app.models.invite_code import InviteCode
 from app.models.integration_account import IntegrationAccount
 from app.models.internal_bot import InternalBotMessage
 from app.models.notification import Notification
@@ -42,6 +43,7 @@ __all__ = [
     "IntegrationLog",
     "InventoryMovement",
     "InventoryProduct",
+    "InviteCode",
     "Notification",
     "Payment",
     "PaymentItem",

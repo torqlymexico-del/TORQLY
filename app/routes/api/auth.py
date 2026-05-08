@@ -8,11 +8,13 @@ from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.enums import UserRole
-from app.models import User
+from app.models import InviteCode, User
+from sqlalchemy import select as sa_select
 from app.schemas.auth import LoginRequest, RegisterRequest, Token
 from app.schemas.user import UserCreate, UserRead
 from app.security import create_access_token
-from app.services.exceptions import ConflictError
+from app.services.exceptions import ConflictError, ValidationError
+from app.services.invite_codes import any_users_exist, validate_and_use_invite_code
 from app.services.users import authenticate_user, create_user
 
 
@@ -47,18 +49,44 @@ def session_login(payload: LoginRequest, response: Response, db: Annotated[Sessi
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, response: Response, db: Annotated[Session, Depends(get_db)]) -> UserRead:
-    """Registro público: crea usuario admin y abre sesión automáticamente."""
+    """Registro público: requiere código de invitación (excepto el primer usuario)."""
+    is_first_user = not any_users_exist(db)
+    if not is_first_user and not payload.invite_code:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Se requiere un código de acceso.")
+
+    # Determine role from invite code (or admin if first user)
+    role = UserRole.ADMIN
+    invite_company_id: int | None = None
+    if not is_first_user:
+        invite = db.scalar(
+            sa_select(InviteCode).where(InviteCode.code == payload.invite_code.upper().strip())
+        )
+        if not invite or not invite.is_active or invite.used_at is not None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Código de acceso inválido o ya utilizado.")
+        role = UserRole(invite.role)
+        invite_company_id = invite.company_id
+
     create_payload = UserCreate(
         name=payload.name,
         phone=payload.phone,
         password=payload.password,
         email=payload.email,
-        role=UserRole.ADMIN,
+        role=role,
+        company_id=invite_company_id,
+        active_company_id=invite_company_id,
     )
     try:
         user = create_user(db, create_payload)
     except ConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    # Mark invite code as used
+    if not is_first_user:
+        try:
+            validate_and_use_invite_code(db, code=payload.invite_code, user=user)
+        except (ValidationError, Exception):
+            pass  # user already created, best effort
+
     token = create_access_token(user.id, expires_delta=timedelta(minutes=settings.access_token_expire_minutes))
     response.set_cookie(
         key=settings.auth_cookie_name,

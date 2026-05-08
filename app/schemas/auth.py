@@ -11,6 +11,7 @@ class RegisterRequest(BaseModel):
     phone: str = Field(min_length=7, max_length=25)
     password: str = Field(min_length=8, max_length=128)
     email: EmailStr | None = None
+    invite_code: str | None = None
 
 
 class Token(BaseModel):

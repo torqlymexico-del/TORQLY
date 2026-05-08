@@ -40,6 +40,7 @@ export default function Login() {
   const [rEmailConf, setREmailConf] = useState("");
   const [rPwd, setRPwd]             = useState("");
   const [rPwdConf, setRPwdConf]     = useState("");
+  const [rCode, setRCode]           = useState("");
 
   function switchMode(next: "login" | "register") {
     setMode(next);
@@ -75,6 +76,7 @@ export default function Login() {
         phone: rPhone.trim(),
         password: rPwd,
         email: rEmail.trim() || null,
+        invite_code: rCode.trim() || null,
       });
       await refresh();
       navigate("/");
@@ -149,6 +151,18 @@ export default function Login() {
             {/* ── Register form ── */}
             {mode === "register" && (
               <form onSubmit={handleRegister} className="space-y-4">
+                <Field label="Código de acceso">
+                  <input
+                    className={inputCls}
+                    placeholder="Ej. TQK3X9PL"
+                    value={rCode}
+                    onChange={e => setRCode(e.target.value.toUpperCase())}
+                    autoComplete="off"
+                    maxLength={20}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-0.5">Solicítalo a tu administrador. Solo el primer usuario puede registrarse sin código.</p>
+                </Field>
+
                 <Field label="Nombre completo">
                   <input className={inputCls} placeholder="Juan Pérez" value={rName}
                     onChange={e => setRName(e.target.value)} required />

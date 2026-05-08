@@ -19,6 +19,7 @@ import CashSessions from "@/pages/CashSessions";
 import Credits from "@/pages/Credits";
 import Payroll from "@/pages/Payroll";
 import ServiceEntry from "@/pages/ServiceEntry";
+import Team from "@/pages/Team";
 // Domicilios
 import DomiciliosDashboard from "@/pages/domicilios/Dashboard";
 import Zones from "@/pages/domicilios/Zones";
@@ -72,6 +73,7 @@ export default function App() {
           <Route path="/credits"       element={<Protected><Credits /></Protected>} />
           <Route path="/payroll"       element={<Protected><Payroll /></Protected>} />
           <Route path="/alta"          element={<Protected><ServiceEntry /></Protected>} />
+          <Route path="/team"          element={<Protected><Team /></Protected>} />
 
           {/* ── Domicilios branch ── */}
           <Route path="/domicilios"              element={<Protected><DomiciliosDashboard /></Protected>} />
