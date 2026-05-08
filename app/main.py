@@ -60,6 +60,11 @@ app.add_middleware(
 # Archivos estáticos legacy (CSS/imágenes del sistema anterior)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
+# Uploads del chat (imágenes, archivos)
+_uploads_dir = Path(__file__).resolve().parent.parent / "uploads"
+_uploads_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
+
 # Assets del build de React (JS/CSS compilados)
 if (_dist_dir / "assets").exists():
     app.mount("/assets", StaticFiles(directory=str(_dist_dir / "assets")), name="spa-assets")

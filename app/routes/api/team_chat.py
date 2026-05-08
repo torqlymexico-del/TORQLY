@@ -1,7 +1,9 @@
+import uuid
+from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -11,9 +13,32 @@ from app.models import TeamMessage
 
 router = APIRouter(prefix="/team-chat", tags=["team-chat"])
 
+UPLOAD_DIR = Path(__file__).resolve().parent.parent.parent.parent / "uploads" / "chat"
+
+ALLOWED_MIME_PREFIXES = ("image/", "video/", "audio/")
+ALLOWED_MIME_EXACT = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/zip",
+    "text/plain",
+}
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
 
 class MessageIn(BaseModel):
-    content: str = Field(min_length=1, max_length=2000)
+    content: str = Field(default="", max_length=2000)
+    attachment_url: str | None = None
+    attachment_type: str | None = None
+    attachment_name: str | None = None
+
+    @model_validator(mode="after")
+    def check_not_empty(self):
+        if not self.content.strip() and not self.attachment_url:
+            raise ValueError("Se requiere contenido o adjunto")
+        return self
 
 
 class MessageOut(BaseModel):
@@ -22,44 +47,98 @@ class MessageOut(BaseModel):
     user_name: str
     user_role: str
     content: str
+    attachment_url: str | None
+    attachment_type: str | None
+    attachment_name: str | None
     created_at: str
 
     model_config = {"from_attributes": True}
+
+
+class UploadOut(BaseModel):
+    url: str
+    type: str
+    name: str
+
+
+def _to_out(m: TeamMessage, name: str | None = None, role: str | None = None) -> MessageOut:
+    return MessageOut(
+        id=m.id,
+        user_id=m.user_id,
+        user_name=name or (m.user.name if m.user else "?"),
+        user_role=role or (m.user.role if m.user else ""),
+        content=m.content,
+        attachment_url=m.attachment_url,
+        attachment_type=m.attachment_type,
+        attachment_name=m.attachment_name,
+        created_at=m.created_at.isoformat(),
+    )
+
+
+@router.post("/upload", response_model=UploadOut)
+async def upload_attachment(
+    file: UploadFile,
+    current_user=Depends(get_current_user),
+) -> UploadOut:
+    content_type = file.content_type or ""
+    is_allowed = (
+        any(content_type.startswith(p) for p in ALLOWED_MIME_PREFIXES)
+        or content_type in ALLOWED_MIME_EXACT
+    )
+    if not is_allowed:
+        raise HTTPException(status_code=415, detail="Tipo de archivo no permitido")
+
+    data = await file.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    ext = Path(file.filename or "file").suffix.lower()
+    filename = f"{uuid.uuid4().hex}{ext}"
+    (UPLOAD_DIR / filename).write_bytes(data)
+
+    if content_type.startswith("image/"):
+        attach_type = "image"
+    elif content_type.startswith("video/"):
+        attach_type = "video"
+    elif content_type.startswith("audio/"):
+        attach_type = "audio"
+    else:
+        attach_type = "file"
+
+    return UploadOut(
+        url=f"/uploads/chat/{filename}",
+        type=attach_type,
+        name=file.filename or filename,
+    )
 
 
 @router.get("/", response_model=list[MessageOut])
 def get_messages(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(get_current_user),
-    since_id: int = Query(default=0),
+    since_id: int | None = Query(default=None),
     limit: int = Query(default=60, le=200),
 ) -> list[MessageOut]:
     company_id = current_company_id(current_user)
-    q = (
-        select(TeamMessage)
-        .where(TeamMessage.company_id == company_id)
-        .order_by(TeamMessage.id.desc())
-        .limit(limit)
-    )
-    if since_id:
-        q = select(TeamMessage).where(
-            TeamMessage.company_id == company_id,
-            TeamMessage.id > since_id,
-        ).order_by(TeamMessage.id.asc()).limit(limit)
-    msgs = list(db.scalars(q).all())
-    if not since_id:
-        msgs = list(reversed(msgs))
-    return [
-        MessageOut(
-            id=m.id,
-            user_id=m.user_id,
-            user_name=m.user.name if m.user else "?",
-            user_role=m.user.role if m.user else "",
-            content=m.content,
-            created_at=m.created_at.isoformat(),
-        )
-        for m in reversed(msgs)
-    ]
+
+    if since_id is not None:
+        msgs = list(db.scalars(
+            select(TeamMessage)
+            .where(TeamMessage.company_id == company_id, TeamMessage.id > since_id)
+            .order_by(TeamMessage.id.asc())
+            .limit(limit)
+        ).all())
+    else:
+        rows = list(db.scalars(
+            select(TeamMessage)
+            .where(TeamMessage.company_id == company_id)
+            .order_by(TeamMessage.id.desc())
+            .limit(limit)
+        ).all())
+        msgs = list(reversed(rows))
+
+    return [_to_out(m) for m in msgs]
 
 
 @router.post("/", response_model=MessageOut, status_code=201)
@@ -73,15 +152,11 @@ def send_message(
         company_id=company_id,
         user_id=current_user.id,
         content=payload.content.strip(),
+        attachment_url=payload.attachment_url,
+        attachment_type=payload.attachment_type,
+        attachment_name=payload.attachment_name,
     )
     db.add(msg)
     db.commit()
     db.refresh(msg)
-    return MessageOut(
-        id=msg.id,
-        user_id=msg.user_id,
-        user_name=current_user.name,
-        user_role=current_user.role,
-        content=msg.content,
-        created_at=msg.created_at.isoformat(),
-    )
+    return _to_out(msg, name=current_user.name, role=current_user.role)
