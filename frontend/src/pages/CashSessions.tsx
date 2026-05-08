@@ -265,11 +265,10 @@ export default function CashSessions() {
             </div>
           </div>
 
-          {/* Top 3 summary stats */}
-          <div className="grid grid-cols-3 gap-3">
+          {/* Top 2 summary stats */}
+          <div className="grid grid-cols-2 gap-3">
             <StatCard label="Generado en el día" value={fmt(generatedToday)} color="green" />
             <StatCard label="Egresos y retiros" value={fmt(session.total_expenses)} color="red" />
-            <StatCard label="Cambio entregado" value={fmt(session.change_given)} color="amber" />
           </div>
 
           {/* Payment methods breakdown — 6 cards */}
