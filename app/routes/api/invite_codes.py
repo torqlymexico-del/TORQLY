@@ -25,15 +25,11 @@ def get_invite_codes(
     codes = list_invite_codes(db, company_id=company_id)
     return [
         InviteCodeRead(
-            id=c.id,
-            code=c.code,
-            role=c.role,
-            label=c.label,
+            id=c.id, code=c.code, role=c.role, branch=c.branch, label=c.label,
             is_active=c.is_active,
             created_by_name=c.created_by.name if c.created_by else None,
             used_by_name=c.used_by.name if c.used_by else None,
-            used_at=c.used_at,
-            created_at=c.created_at,
+            used_at=c.used_at, created_at=c.created_at,
         )
         for c in codes
     ]
@@ -53,21 +49,16 @@ def create_invite_code(
             db,
             company_id=company_id,
             role=payload.role,
+            branch=payload.branch,
             created_by_id=current_user.id,
             label=payload.label,
         )
     except ServiceError as exc:
         raise_api_error(exc)
     return InviteCodeRead(
-        id=code.id,
-        code=code.code,
-        role=code.role,
-        label=code.label,
-        is_active=code.is_active,
-        created_by_name=current_user.name,
-        used_by_name=None,
-        used_at=None,
-        created_at=code.created_at,
+        id=code.id, code=code.code, role=code.role, branch=code.branch, label=code.label,
+        is_active=code.is_active, created_by_name=current_user.name,
+        used_by_name=None, used_at=None, created_at=code.created_at,
     )
 
 

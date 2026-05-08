@@ -23,6 +23,7 @@ class User(Base, TimestampMixin):
     privacy_policy_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     privacy_policy_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     role: Mapped[str] = mapped_column(String(30), nullable=False, default=UserRole.OPERATOR.value)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, server_default="local")
     clickup_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     weekly_salary: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     commission_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=0)

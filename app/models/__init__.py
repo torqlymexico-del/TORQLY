@@ -10,6 +10,7 @@ from app.models.commission import Commission
 from app.models.company import Company
 from app.models.external_sync import ExternalSyncRecord
 from app.models.inventory import InventoryMovement, InventoryProduct
+from app.models.direct_message import DirectMessage
 from app.models.invite_code import InviteCode
 from app.models.team_message import TeamMessage
 from app.models.integration_account import IntegrationAccount
@@ -38,6 +39,7 @@ __all__ = [
     "Commission",
     "CommissionPayment",
     "Company",
+    "DirectMessage",
     "ExternalSyncRecord",
     "IntegrationAccount",
     "InternalBotMessage",

@@ -5,6 +5,7 @@ from app.schemas.common import ORMBaseModel
 
 class InviteCodeCreate(ORMBaseModel):
     role: str
+    branch: str = "local"
     label: str | None = None
 
 
@@ -12,6 +13,7 @@ class InviteCodeRead(ORMBaseModel):
     id: int
     code: str
     role: str
+    branch: str = "local"
     label: str | None
     is_active: bool
     created_by_name: str | None = None

@@ -14,6 +14,7 @@ class InviteCode(Base, TimestampMixin):
     code: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), nullable=False, index=True)
     role: Mapped[str] = mapped_column(String(30), nullable=False)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, server_default="local")
     label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)

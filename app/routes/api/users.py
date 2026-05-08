@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -8,7 +8,7 @@ from app.dependencies import current_company_id, get_current_user, require_roles
 from app.enums import UserRole
 from app.schemas.user import UserCreate, UserRead, UserSelfUpdate, UserUpdate
 from app.services.exceptions import ServiceError
-from app.services.users import create_user, get_user, list_assignable_operators, list_users, update_user
+from app.services.users import create_user, delete_user, get_user, list_assignable_operators, list_users, update_user
 from app.routes.api.common import raise_api_error
 
 
@@ -19,8 +19,9 @@ router = APIRouter(prefix="/users", tags=["users"])
 def get_users(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(require_roles(UserRole.ADMIN, UserRole.SUPERVISOR)),
+    branch: str | None = Query(default=None),
 ) -> list[UserRead]:
-    return [UserRead.model_validate(user) for user in list_users(db, company_id=current_company_id(current_user))]
+    return [UserRead.model_validate(user) for user in list_users(db, company_id=current_company_id(current_user), branch=branch)]
 
 
 @router.get("/operators", response_model=list[UserRead])
@@ -67,6 +68,18 @@ def create_user_endpoint(
 ) -> UserRead:
     try:
         return UserRead.model_validate(create_user(db, payload, actor=current_user))
+    except ServiceError as exc:
+        raise_api_error(exc)
+
+
+@router.delete("/{user_id}", status_code=204)
+def delete_user_endpoint(
+    user_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(require_roles(UserRole.ADMIN)),
+) -> None:
+    try:
+        delete_user(db, user_id, company_id=current_company_id(current_user), actor=current_user)
     except ServiceError as exc:
         raise_api_error(exc)
 

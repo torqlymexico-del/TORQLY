@@ -12,10 +12,12 @@ from app.services.companies import ensure_default_company
 from app.services.exceptions import ConflictError, NotFoundError
 
 
-def list_users(session: Session, *, company_id: int | None = None) -> list[User]:
+def list_users(session: Session, *, company_id: int | None = None, branch: str | None = None) -> list[User]:
     query = select(User).order_by(User.name)
     if company_id is not None:
         query = query.where(User.company_id == company_id)
+    if branch is not None:
+        query = query.where(User.branch == branch)
     return list(session.scalars(query).all())
 
 
@@ -164,6 +166,20 @@ def create_user(session: Session, payload: UserCreate, *, actor: User | None = N
     session.commit()
     session.refresh(user)
     return user
+
+
+def delete_user(session: Session, user_id: int, *, company_id: int | None = None, actor: User | None = None) -> None:
+    user = get_user(session, user_id, company_id=company_id)
+    log_action(
+        session,
+        actor=actor,
+        action="users.delete",
+        entity_type="user",
+        entity_id=user.id,
+        description=f"Eliminación de usuario {user.name}.",
+    )
+    session.delete(user)
+    session.commit()
 
 
 def update_user(session: Session, user_id: int, payload: UserUpdate, *, actor: User | None = None) -> User:

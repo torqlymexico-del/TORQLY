@@ -80,10 +80,14 @@ def register(payload: RegisterRequest, response: Response, db: Annotated[Session
     except ConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
 
-    # Mark invite code as used
+    # Set branch from invite code and mark it as used
     if not is_first_user:
         try:
-            validate_and_use_invite_code(db, code=payload.invite_code, user=user)
+            used_invite = validate_and_use_invite_code(db, code=payload.invite_code, user=user)
+            user.branch = used_invite.branch
+            db.add(user)
+            db.commit()
+            db.refresh(user)
         except (ValidationError, Exception):
             pass  # user already created, best effort
 

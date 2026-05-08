@@ -139,7 +139,7 @@ export default function Orders({ branch = "local" }: { branch?: string }) {
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getVehicle  = useCallback((id: number | null) => vehicles.find(v => v.id === id),   [vehicles]);
   const getClient   = useCallback((id: number | null) => clients.find(c => c.id === id),    [clients]);
-  const opName      = useCallback((uid: number)       => operators.find(o => o.id === uid)?.name ?? `#${uid}`, [operators]);
+  const opName      = useCallback((uid: number | null) => uid == null ? "Sin asignar" : (operators.find(o => o.id === uid)?.name ?? `Lavador ${uid}`), [operators]);
   const catalogName = useCallback((id: number | null) => services.find(s => s.id === id)?.name ?? "Servicio",  [services]);
 
   function vehicleLabel(v: Vehicle | undefined) {

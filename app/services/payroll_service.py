@@ -34,7 +34,6 @@ def get_operator_summary(session: Session, user_id: int, company_id: int | None)
     if not user:
         raise NotFoundError("Operador no encontrado.")
 
-    # Unpaid commissions from service order washers
     unpaid_washers = list(
         session.scalars(
             select(ServiceOrderWasher)
@@ -42,9 +41,8 @@ def get_operator_summary(session: Session, user_id: int, company_id: int | None)
             .where(ServiceOrderWasher.is_paid.is_(False))
         ).all()
     )
-    pending_commission = sum(w.commission_amount for w in unpaid_washers)
+    total_pending = sum(w.commission_amount for w in unpaid_washers)
 
-    # Deductions
     deductions = list(
         session.scalars(
             select(PayrollDeduction)
@@ -58,13 +56,29 @@ def get_operator_summary(session: Session, user_id: int, company_id: int | None)
     return {
         "user_id": user_id,
         "name": user.name,
-        "role": user.role,
-        "weekly_salary": float(user.weekly_salary or 0),
-        "commission_percentage": float(user.commission_percentage or 0),
-        "pending_commission": float(pending_commission),
+        "pending_commissions": [
+            {
+                "id": w.id,
+                "order_id": w.order_id,
+                "commission_amount": float(w.commission_amount),
+                "commission_percent": float(w.commission_percent),
+            }
+            for w in unpaid_washers
+        ],
+        "deductions": [
+            {
+                "id": d.id,
+                "deduction_type": d.deduction_type,
+                "quantity": d.quantity,
+                "unit_amount": float(d.unit_amount),
+                "total_amount": float(d.total_amount),
+                "notes": d.notes,
+            }
+            for d in deductions
+        ],
+        "total_pending_commissions": float(total_pending),
         "total_deductions": float(total_deductions),
-        "net_commission": float(pending_commission - total_deductions),
-        "deductions": deductions,
+        "net_payable": float(total_pending - total_deductions),
     }
 
 

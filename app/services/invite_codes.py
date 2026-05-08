@@ -22,6 +22,7 @@ def generate_invite_code(
     company_id: int,
     role: str,
     created_by_id: int,
+    branch: str = "local",
     label: str | None = None,
 ) -> InviteCode:
     for _ in range(10):
@@ -32,6 +33,7 @@ def generate_invite_code(
         code=code,
         company_id=company_id,
         role=role,
+        branch=branch,
         label=label,
         created_by_id=created_by_id,
     )

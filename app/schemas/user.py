@@ -56,6 +56,7 @@ class UserRead(ORMBaseModel):
     phone: str | None = None
     email: str | None = None
     role: UserRole
+    branch: str = "local"
     clickup_user_id: str | None = None
     weekly_salary: Decimal = Decimal("0.00")
     commission_percentage: Decimal = Decimal("0.00")
