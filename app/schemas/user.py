@@ -41,6 +41,13 @@ class UserUpdate(ORMBaseModel):
     notes: str | None = None
 
 
+class UserSelfUpdate(ORMBaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    phone: str | None = Field(default=None, min_length=7, max_length=25)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+
+
 class UserRead(ORMBaseModel):
     id: int
     company_id: int | None = None

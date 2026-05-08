@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.dependencies import current_company_id, get_current_user, require_roles
 from app.enums import UserRole
-from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.schemas.user import UserCreate, UserRead, UserSelfUpdate, UserUpdate
 from app.services.exceptions import ServiceError
 from app.services.users import create_user, get_user, list_assignable_operators, list_users, update_user
 from app.routes.api.common import raise_api_error
@@ -32,6 +32,19 @@ def get_operators(
         UserRead.model_validate(user)
         for user in list_assignable_operators(db, company_id=current_company_id(current_user))
     ]
+
+
+@router.patch("/me", response_model=UserRead)
+def update_me(
+    payload: UserSelfUpdate,
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(get_current_user),
+) -> UserRead:
+    update_payload = UserUpdate(**payload.model_dump(exclude_unset=True))
+    try:
+        return UserRead.model_validate(update_user(db, current_user.id, update_payload, actor=current_user))
+    except ServiceError as exc:
+        raise_api_error(exc)
 
 
 @router.get("/{user_id}", response_model=UserRead)
