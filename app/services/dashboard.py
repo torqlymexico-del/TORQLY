@@ -153,7 +153,7 @@ def dashboard_snapshot(session: Session, *, target_date: date, company_id: int |
             "payment_status": o.payment_status,
             "total": str(o.total),
             "vehicle": {
-                "plate": o.vehicle.plate if o.vehicle else None,
+                "plate": o.vehicle.plates if o.vehicle else None,
                 "brand": o.vehicle.brand if o.vehicle else None,
                 "model": o.vehicle.model if o.vehicle else None,
                 "color": o.vehicle.color if o.vehicle else None,
