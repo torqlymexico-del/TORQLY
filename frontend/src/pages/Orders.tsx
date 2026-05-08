@@ -80,7 +80,7 @@ const dangerBtn  = "w-full py-3 rounded-xl bg-red-500 hover:bg-red-600 active:sc
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function Orders() {
+export default function Orders({ branch = "local" }: { branch?: string }) {
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const [orders,    setOrders]    = useState<Order[]>([]);
@@ -157,7 +157,7 @@ export default function Orders() {
   const loadOrders = useCallback(async () => {
     setLoading(true);
     try {
-      const params: Record<string, string> = {};
+      const params: Record<string, string> = { branch };
       if (scope === "today")   { params.date_from = todayStr(); params.date_to = todayStr(); }
       else if (scope === "date") { params.date_from = dateFrom; params.date_to = dateTo; }
       else                     { params.limit = "200"; }
@@ -416,7 +416,7 @@ export default function Orders() {
           unit_price:  parseFloat(i.unit_price) || 0,
           quantity:    i.quantity,
         })),
-        is_domicilio:     newIsDom,
+        is_domicilio:     branch === "domicilios" ? true : newIsDom,
         delivery_address: newIsDom ? newAddr : null,
         notes:            newNotes || null,
       });

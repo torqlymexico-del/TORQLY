@@ -103,6 +103,7 @@ class OrderOut(BaseModel):
     payment_status: str
     payment_method: str | None = None
     is_domicilio: bool
+    branch: str = "local"
     delivery_address: str | None = None
     notes: str | None = None
     items: list[ItemOut] = []
@@ -120,6 +121,7 @@ def get_orders(
     status: str | None = Query(None),
     date_from: date | None = Query(None),
     date_to: date | None = Query(None),
+    branch: str | None = Query(None),
     limit: int = Query(100, le=500),
 ):
     orders = list_orders(
@@ -128,6 +130,7 @@ def get_orders(
         status=status,
         date_from=date_from,
         date_to=date_to,
+        branch=branch,
         limit=limit,
     )
     return [OrderOut.model_validate(o) for o in orders]

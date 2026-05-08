@@ -97,17 +97,19 @@ class MovementOut(BaseModel):
 def get_sessions(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR))],
+    branch: str = Query("local"),
     limit: int = Query(50, le=200),
 ):
-    return [SessionOut.model_validate(s) for s in list_sessions(db, company_id=current_company_id(current_user), limit=limit)]
+    return [SessionOut.model_validate(s) for s in list_sessions(db, company_id=current_company_id(current_user), branch=branch, limit=limit)]
 
 
 @router.get("/open", response_model=SessionOut | None)
 def get_open(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    branch: str = Query("local"),
 ):
-    cs = get_open_session(db, company_id=current_company_id(current_user))
+    cs = get_open_session(db, company_id=current_company_id(current_user), branch=branch)
     return SessionOut.model_validate(cs) if cs else None
 
 
@@ -116,6 +118,7 @@ def open_cash_session(
     payload: OpenSessionIn,
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR))],
+    branch: str = Query("local"),
 ):
     try:
         cs = open_session(
@@ -124,6 +127,7 @@ def open_cash_session(
             notes=payload.notes,
             actor=current_user,
             company_id=current_company_id(current_user),
+            branch=branch,
         )
         return SessionOut.model_validate(cs)
     except ServiceError as exc:

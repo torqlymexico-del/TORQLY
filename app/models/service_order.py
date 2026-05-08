@@ -36,6 +36,7 @@ class ServiceOrder(Base, TimestampMixin):
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     is_domicilio: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, default="local")
     delivery_address: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     queued_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

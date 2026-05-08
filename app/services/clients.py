@@ -15,11 +15,14 @@ def list_clients(
     *,
     include_deleted: bool = False,
     company_id: int | None = None,
+    branch: str | None = None,
 ) -> list[Client]:
     query = select(Client).order_by(Client.name)
     if not include_deleted:
         query = query.where(Client.deleted_at.is_(None))
     query = query.where(created_by_company_clause(Client, company_id))
+    if branch is not None:
+        query = query.where(Client.branch == branch)
     return list(session.scalars(query).all())
 
 
@@ -42,6 +45,7 @@ def create_client(session: Session, payload: ClientCreate, *, actor: User | None
         address=payload.address,
         notes=payload.notes,
         is_active=payload.is_active,
+        branch=getattr(payload, "branch", "local"),
         created_by_user_id=actor.id if actor else None,
         updated_by_user_id=actor.id if actor else None,
     )

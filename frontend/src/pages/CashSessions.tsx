@@ -81,7 +81,7 @@ const MOV_META: Record<string, { label: string; color: string; icon: React.React
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CashSessions() {
+export default function CashSessions({ branch = "local" }: { branch?: string }) {
   const [session, setSession] = useState<CashSession | null | undefined>(undefined);
   const [sessions, setSessions] = useState<CashSession[]>([]);
   const [movements, setMovements] = useState<CashMovement[]>([]);
@@ -119,8 +119,8 @@ export default function CashSessions() {
     setError("");
     try {
       const [openRes, listRes] = await Promise.all([
-        api.get<CashSession | null>("/cash-sessions/open"),
-        api.get<CashSession[]>("/cash-sessions/"),
+        api.get<CashSession | null>("/cash-sessions/open", { params: { branch } }),
+        api.get<CashSession[]>("/cash-sessions/", { params: { branch } }),
       ]);
       const openSession = openRes.data ?? null;
       setSession(openSession);
@@ -143,7 +143,7 @@ export default function CashSessions() {
   async function handleOpenSession() {
     setSaving(true); setError("");
     try {
-      await api.post("/cash-sessions/open", { opening_amount: parseFloat(openAmount) || 0, notes: openNotes || null });
+      await api.post("/cash-sessions/open", { opening_amount: parseFloat(openAmount) || 0, notes: openNotes || null }, { params: { branch } });
       setOpenDlg(false); setOpenAmount("500"); setOpenNotes(""); load();
     } catch (err: unknown) {
       setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Error al abrir la caja.");

@@ -61,7 +61,7 @@ const inputCls = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm fo
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 
-export default function Clients() {
+export default function Clients({ branch = "local" }: { branch?: string }) {
   const [clients, setClients]     = useState<Client[]>([]);
   const [loading, setLoading]     = useState(false);
   const [query, setQuery]         = useState("");
@@ -84,7 +84,7 @@ export default function Clients() {
     setLoading(true);
     setError("");
     try {
-      const res = await api.get<Client[]>("/clients/");
+      const res = await api.get<Client[]>("/clients/", { params: { branch } });
       setClients(res.data);
     } catch {
       setError("Error al cargar clientes.");
@@ -131,6 +131,7 @@ export default function Clients() {
       address:   form.address.trim() || null,
       notes:     form.notes.trim() || null,
       is_active: form.is_active,
+      branch,
     };
     try {
       if (editTarget) {

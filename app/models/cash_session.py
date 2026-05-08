@@ -13,6 +13,7 @@ class CashSession(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, default="local")
 
     opened_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())

@@ -19,6 +19,10 @@ import CashSessions from "@/pages/CashSessions";
 import Credits from "@/pages/Credits";
 import Payroll from "@/pages/Payroll";
 import ServiceEntry from "@/pages/ServiceEntry";
+// Domicilios
+import DomiciliosDashboard from "@/pages/domicilios/Dashboard";
+import Zones from "@/pages/domicilios/Zones";
+import BotConfig from "@/pages/domicilios/BotConfig";
 import { type ReactNode } from "react";
 
 const POLICY_VERSION = "1.0";
@@ -42,31 +46,44 @@ function PublicOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          {/* Public */}
           <Route path="/login"         element={<PublicOnly><Login /></PublicOnly>} />
           <Route path="/accept-policy" element={<AcceptPolicy />} />
+
+          {/* ── Local branch ── */}
           <Route path="/"              element={<Protected><Dashboard /></Protected>} />
           <Route path="/agenda"        element={<Protected><Agenda /></Protected>} />
           <Route path="/pos"           element={<Protected><Pos /></Protected>} />
-          <Route path="/clients"       element={<Protected><Clients /></Protected>} />
+          <Route path="/clients"       element={<Protected><Clients branch="local" /></Protected>} />
           <Route path="/vehicles"      element={<Protected><Vehicles /></Protected>} />
           <Route path="/services"      element={<Protected><Services /></Protected>} />
           <Route path="/commissions"   element={<Protected><Commissions /></Protected>} />
           <Route path="/reports"       element={<Protected><Reports /></Protected>} />
           <Route path="/bot"           element={<Protected><Bot /></Protected>} />
-          <Route path="/notifications"  element={<Protected><Notifications /></Protected>} />
-          <Route path="/integrations"   element={<Protected><Integrations /></Protected>} />
-          <Route path="/orders"         element={<Protected><Orders /></Protected>} />
-          <Route path="/cash-sessions"  element={<Protected><CashSessions /></Protected>} />
-          <Route path="/credits"        element={<Protected><Credits /></Protected>} />
-          <Route path="/payroll"        element={<Protected><Payroll /></Protected>} />
-          <Route path="/alta"           element={<Protected><ServiceEntry /></Protected>} />
-          <Route path="*"              element={<Navigate to="/" replace />} />
+          <Route path="/notifications" element={<Protected><Notifications /></Protected>} />
+          <Route path="/integrations"  element={<Protected><Integrations /></Protected>} />
+          <Route path="/orders"        element={<Protected><Orders branch="local" /></Protected>} />
+          <Route path="/cash-sessions" element={<Protected><CashSessions branch="local" /></Protected>} />
+          <Route path="/credits"       element={<Protected><Credits /></Protected>} />
+          <Route path="/payroll"       element={<Protected><Payroll /></Protected>} />
+          <Route path="/alta"          element={<Protected><ServiceEntry /></Protected>} />
+
+          {/* ── Domicilios branch ── */}
+          <Route path="/domicilios"              element={<Protected><DomiciliosDashboard /></Protected>} />
+          <Route path="/domicilios/orders"       element={<Protected><Orders branch="domicilios" /></Protected>} />
+          <Route path="/domicilios/cash-sessions"element={<Protected><CashSessions branch="domicilios" /></Protected>} />
+          <Route path="/domicilios/clients"      element={<Protected><Clients branch="domicilios" /></Protected>} />
+          <Route path="/domicilios/vehicles"     element={<Protected><Vehicles /></Protected>} />
+          <Route path="/domicilios/zones"        element={<Protected><Zones /></Protected>} />
+          <Route path="/domicilios/commissions"  element={<Protected><Commissions /></Protected>} />
+          <Route path="/domicilios/bot"          element={<Protected><BotConfig /></Protected>} />
+
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

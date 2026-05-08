@@ -9,16 +9,20 @@ from app.models import CashMovement, CashSession, User
 from app.services.exceptions import ConflictError, NotFoundError, ValidationError
 
 
-def get_open_session(session: Session, *, company_id: int | None = None) -> CashSession | None:
-    q = select(CashSession).where(CashSession.status == CashSessionStatus.OPEN.value)
+def get_open_session(session: Session, *, company_id: int | None = None, branch: str = "local") -> CashSession | None:
+    q = select(CashSession).where(
+        CashSession.status == CashSessionStatus.OPEN.value,
+        CashSession.branch == branch,
+    )
     if company_id is not None:
         q = q.where(CashSession.company_id == company_id)
     return session.scalar(q)
 
 
-def list_sessions(session: Session, *, company_id: int | None = None, limit: int = 50) -> list[CashSession]:
+def list_sessions(session: Session, *, company_id: int | None = None, branch: str = "local", limit: int = 50) -> list[CashSession]:
     q = (
         select(CashSession)
+        .where(CashSession.branch == branch)
         .order_by(CashSession.opened_at.desc())
         .limit(limit)
     )
@@ -34,8 +38,9 @@ def open_session(
     notes: str | None,
     actor: User,
     company_id: int | None,
+    branch: str = "local",
 ) -> CashSession:
-    existing = get_open_session(session, company_id=company_id)
+    existing = get_open_session(session, company_id=company_id, branch=branch)
     if existing:
         raise ConflictError("Ya hay una sesión de caja abierta. Ciérrala antes de abrir una nueva.")
 
@@ -47,6 +52,7 @@ def open_session(
         opening_amount=opening_amount,
         status=CashSessionStatus.OPEN.value,
         notes=notes,
+        branch=branch,
     )
     session.add(cs)
     session.commit()

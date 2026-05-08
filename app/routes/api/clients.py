@@ -19,10 +19,11 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 def get_clients(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR)),
+    branch: str | None = None,
 ) -> list[ClientRead]:
     return [
         ClientRead.model_validate(client)
-        for client in list_clients(db, company_id=current_company_id(current_user))
+        for client in list_clients(db, company_id=current_company_id(current_user), branch=branch)
     ]
 
 

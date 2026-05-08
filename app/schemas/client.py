@@ -10,6 +10,7 @@ class ClientBase(ORMBaseModel):
     address: str | None = Field(default=None, max_length=255)
     notes: str | None = None
     is_active: bool = True
+    branch: str = "local"
 
 
 class ClientCreate(ClientBase):
@@ -27,4 +28,5 @@ class ClientUpdate(ORMBaseModel):
 
 class ClientRead(ClientBase):
     id: int
+    branch: str = "local"
 

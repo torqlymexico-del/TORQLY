@@ -16,6 +16,7 @@ def list_orders(
     status: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    branch: str | None = None,
     limit: int = 100,
 ) -> list[ServiceOrder]:
     q = select(ServiceOrder).order_by(ServiceOrder.created_at.desc()).limit(limit)
@@ -27,6 +28,8 @@ def list_orders(
         q = q.where(ServiceOrder.service_date >= date_from)
     if date_to:
         q = q.where(ServiceOrder.service_date <= date_to)
+    if branch is not None:
+        q = q.where(ServiceOrder.branch == branch)
     return list(session.scalars(q).all())
 
 
@@ -70,6 +73,7 @@ def create_order(
         status=OrderStatus.QUEUED.value,
         payment_status=OrderPaymentStatus.PENDING.value,
         is_domicilio=is_domicilio,
+        branch="domicilios" if is_domicilio else "local",
         delivery_address=delivery_address,
         notes=notes,
         queued_at=now,
