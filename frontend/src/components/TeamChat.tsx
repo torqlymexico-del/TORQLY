@@ -155,9 +155,7 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await api.post<PendingAttachment>("/team-chat/upload", form, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const res = await api.post<PendingAttachment>("/team-chat/upload", form);
       setPending(res.data);
     } catch (err: any) {
       alert(err?.response?.data?.detail || "Error al subir archivo");
