@@ -1,7 +1,8 @@
+import traceback
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,4 +20,7 @@ def get_dashboard_summary(
     current_user=Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR)),
     target_date: date = Query(default_factory=date.today),
 ) -> dict:
-    return dashboard_snapshot(db, target_date=target_date, company_id=current_company_id(current_user))
+    try:
+        return dashboard_snapshot(db, target_date=target_date, company_id=current_company_id(current_user))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}")
