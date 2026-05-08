@@ -5,14 +5,15 @@ from app.models import CatalogFamily, CatalogSubfamily
 from app.services.exceptions import NotFoundError
 
 
-def list_families(session: Session) -> list[CatalogFamily]:
-    return list(
-        session.scalars(
-            select(CatalogFamily)
-            .where(CatalogFamily.is_active.is_(True))
-            .order_by(CatalogFamily.sort_order, CatalogFamily.name)
-        ).all()
+def list_families(session: Session, *, branch: str | None = None) -> list[CatalogFamily]:
+    q = (
+        select(CatalogFamily)
+        .where(CatalogFamily.is_active.is_(True))
+        .order_by(CatalogFamily.sort_order, CatalogFamily.name)
     )
+    if branch is not None:
+        q = q.where(CatalogFamily.branch == branch)
+    return list(session.scalars(q).all())
 
 
 def get_family(session: Session, family_id: int) -> CatalogFamily:
@@ -22,8 +23,8 @@ def get_family(session: Session, family_id: int) -> CatalogFamily:
     return f
 
 
-def create_family(session: Session, *, name: str, color_code: str = "#334155", sort_order: int = 0) -> CatalogFamily:
-    f = CatalogFamily(name=name, color_code=color_code, sort_order=sort_order)
+def create_family(session: Session, *, name: str, color_code: str = "#334155", sort_order: int = 0, branch: str = "local") -> CatalogFamily:
+    f = CatalogFamily(branch=branch, name=name, color_code=color_code, sort_order=sort_order)
     session.add(f)
     session.commit()
     session.refresh(f)
@@ -48,10 +49,16 @@ def update_family(
     return f
 
 
-def list_subfamilies(session: Session, family_id: int | None = None) -> list[CatalogSubfamily]:
-    q = select(CatalogSubfamily).where(CatalogSubfamily.is_active.is_(True))
+def list_subfamilies(session: Session, family_id: int | None = None, branch: str | None = None) -> list[CatalogSubfamily]:
+    q = (
+        select(CatalogSubfamily)
+        .join(CatalogFamily, CatalogSubfamily.family_id == CatalogFamily.id)
+        .where(CatalogSubfamily.is_active.is_(True))
+    )
     if family_id is not None:
         q = q.where(CatalogSubfamily.family_id == family_id)
+    if branch is not None:
+        q = q.where(CatalogFamily.branch == branch)
     return list(session.scalars(q.order_by(CatalogSubfamily.sort_order, CatalogSubfamily.name)).all())
 
 

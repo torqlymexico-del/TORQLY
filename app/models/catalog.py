@@ -9,6 +9,7 @@ class CatalogFamily(Base, TimestampMixin):
     __tablename__ = "catalog_families"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     color_code: Mapped[str] = mapped_column(String(7), nullable=False, default="#334155")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

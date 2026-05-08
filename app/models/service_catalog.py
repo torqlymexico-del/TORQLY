@@ -15,7 +15,8 @@ class ServiceCatalog(Base, TimestampMixin, SoftDeleteMixin, ActorAuditMixin):
     subfamily_id: Mapped[int | None] = mapped_column(
         ForeignKey("catalog_subfamilies.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True, index=True)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, default=0)
     estimated_duration_minutes: Mapped[int] = mapped_column(Integer, nullable=False, default=60)

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -25,10 +25,11 @@ router = APIRouter(prefix="/services-catalog", tags=["services_catalog"])
 def get_services(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR)),
+    branch: str = Query(default="local"),
 ) -> list[ServiceCatalogRead]:
     return [
         ServiceCatalogRead.model_validate(service)
-        for service in list_services(db, company_id=current_company_id(current_user))
+        for service in list_services(db, company_id=current_company_id(current_user), branch=branch)
     ]
 
 

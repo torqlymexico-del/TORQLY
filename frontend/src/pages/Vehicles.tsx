@@ -71,7 +71,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 
-export default function Vehicles() {
+export default function Vehicles({ branch = "local" }: { branch?: string }) {
   const [vehicles, setVehicles]   = useState<Vehicle[]>([]);
   const [clients, setClients]     = useState<Client[]>([]);
   const [loading, setLoading]     = useState(false);
@@ -98,8 +98,8 @@ export default function Vehicles() {
     setError("");
     try {
       const [vRes, cRes] = await Promise.all([
-        api.get<Vehicle[]>("/vehicles/"),
-        api.get<Client[]>("/clients/"),
+        api.get<Vehicle[]>("/vehicles/", { params: { branch } }),
+        api.get<Client[]>("/clients/", { params: { branch } }),
       ]);
       setVehicles(vRes.data);
       setClients(cRes.data);
@@ -108,7 +108,7 @@ export default function Vehicles() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [branch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -143,6 +143,7 @@ export default function Vehicles() {
     setFormError("");
     const payload = {
       client_id: Number(form.client_id),
+      branch,
       brand:     form.brand.trim(),
       model:     form.model.trim(),
       year:      form.year ? Number(form.year) : null,

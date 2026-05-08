@@ -13,6 +13,7 @@ class Vehicle(Base, TimestampMixin, SoftDeleteMixin, ActorAuditMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id"), nullable=True, index=True)
+    branch: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
     brand: Mapped[str] = mapped_column(String(80), nullable=False)
     model: Mapped[str] = mapped_column(String(80), nullable=False)
     type: Mapped[str | None] = mapped_column(String(20), nullable=True, default="sedan")

@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,10 +19,11 @@ router = APIRouter(prefix="/vehicles", tags=["vehicles"])
 def get_vehicles(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR)),
+    branch: str = Query(default="local"),
 ) -> list[VehicleRead]:
     return [
         VehicleRead.model_validate(vehicle)
-        for vehicle in list_vehicles(db, company_id=current_company_id(current_user))
+        for vehicle in list_vehicles(db, company_id=current_company_id(current_user), branch=branch)
     ]
 
 

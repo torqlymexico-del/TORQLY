@@ -15,11 +15,14 @@ def list_vehicles(
     *,
     include_deleted: bool = False,
     company_id: int | None = None,
+    branch: str | None = None,
 ) -> list[Vehicle]:
     query = select(Vehicle).order_by(Vehicle.brand, Vehicle.model)
     if not include_deleted:
         query = query.where(Vehicle.deleted_at.is_(None))
     query = query.where(created_by_company_clause(Vehicle, company_id))
+    if branch is not None:
+        query = query.where(Vehicle.branch == branch)
     return list(session.scalars(query).all())
 
 
@@ -50,6 +53,7 @@ def create_vehicle(session: Session, payload: VehicleCreate, *, actor: User | No
         _validate_client(session, payload.client_id, company_id=getattr(actor, "company_id", None))
     vehicle = Vehicle(
         client_id=payload.client_id,
+        branch=payload.branch,
         brand=payload.brand,
         model=payload.model,
         type=payload.type,

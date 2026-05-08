@@ -46,6 +46,7 @@ const NAV: Record<Branch, { to: string; icon: typeof LayoutDashboard; label: str
     { to: "/domicilios/cash-sessions",icon: Wallet,          label: "Caja" },
     { to: "/domicilios/clients",      icon: Users,           label: "Clientes" },
     { to: "/domicilios/vehicles",     icon: Car,             label: "Vehículos" },
+    { to: "/domicilios/services",     icon: Wrench,          label: "Catálogo" },
     { to: "/domicilios/zones",        icon: MapPin,          label: "Zonas" },
     { to: "/domicilios/commissions",  icon: Scissors,        label: "Comisiones" },
     { to: "/domicilios/bot",          icon: Bot,             label: "Bot / Auto." },

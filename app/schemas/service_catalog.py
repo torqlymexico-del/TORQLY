@@ -7,6 +7,7 @@ from app.schemas.common import ORMBaseModel
 
 
 class ServiceCatalogBase(ORMBaseModel):
+    branch: str = Field(default="local", max_length=20)
     name: str = Field(min_length=2, max_length=120)
     description: str | None = None
     base_price: Decimal = Decimal("0.00")

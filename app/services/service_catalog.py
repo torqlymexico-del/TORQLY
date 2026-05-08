@@ -15,18 +15,20 @@ def list_services(
     *,
     include_deleted: bool = False,
     company_id: int | None = None,
+    branch: str | None = None,
 ) -> list[ServiceCatalog]:
     query = select(ServiceCatalog).order_by(ServiceCatalog.sort_order, ServiceCatalog.name)
     if not include_deleted:
         query = query.where(ServiceCatalog.deleted_at.is_(None))
     if company_id is not None:
-        # include services created by company users OR global services (no creator)
         query = query.where(
             or_(
                 ServiceCatalog.created_by_user_id.is_(None),
                 ServiceCatalog.created_by_user_id.in_(company_user_ids(company_id)),
             )
         )
+    if branch is not None:
+        query = query.where(ServiceCatalog.branch == branch)
     return list(session.scalars(query).all())
 
 
@@ -51,8 +53,9 @@ def _ensure_unique_name(
     *,
     exclude_id: int | None = None,
     company_id: int | None = None,
+    branch: str = "local",
 ) -> None:
-    query = select(ServiceCatalog).where(ServiceCatalog.name == name)
+    query = select(ServiceCatalog).where(ServiceCatalog.name == name, ServiceCatalog.branch == branch)
     if company_id is not None:
         query = query.where(
             or_(
@@ -68,8 +71,9 @@ def _ensure_unique_name(
 
 def create_service(session: Session, payload: ServiceCatalogCreate, *, actor: User | None = None) -> ServiceCatalog:
     company_id = getattr(actor, "company_id", None)
-    _ensure_unique_name(session, payload.name, company_id=company_id)
+    _ensure_unique_name(session, payload.name, company_id=company_id, branch=payload.branch)
     service = ServiceCatalog(
+        branch=payload.branch,
         name=payload.name,
         description=payload.description,
         base_price=payload.base_price,

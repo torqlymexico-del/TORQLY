@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ class FamilyIn(BaseModel):
     color_code: str = "#334155"
     sort_order: int = 0
     is_active: bool = True
+    branch: str = "local"
 
 
 class SubfamilyIn(BaseModel):
@@ -52,8 +53,12 @@ class SubfamilyOut(BaseModel):
 
 
 @router.get("/families", response_model=list[FamilyOut])
-def get_families(db: Annotated[Session, Depends(get_db)], current_user=Depends(require_roles())):
-    return [FamilyOut.model_validate(f) for f in list_families(db)]
+def get_families(
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(require_roles()),
+    branch: str = Query(default="local"),
+):
+    return [FamilyOut.model_validate(f) for f in list_families(db, branch=branch)]
 
 
 @router.post("/families", response_model=FamilyOut)
@@ -62,7 +67,7 @@ def create_family_endpoint(
     db: Annotated[Session, Depends(get_db)],
     current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.SUPERVISOR))],
 ):
-    f = create_family(db, name=payload.name, color_code=payload.color_code, sort_order=payload.sort_order)
+    f = create_family(db, name=payload.name, color_code=payload.color_code, sort_order=payload.sort_order, branch=payload.branch)
     return FamilyOut.model_validate(f)
 
 
@@ -85,8 +90,9 @@ def get_subfamilies(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(require_roles()),
     family_id: int | None = None,
+    branch: str = Query(default="local"),
 ):
-    return [SubfamilyOut.model_validate(sf) for sf in list_subfamilies(db, family_id=family_id)]
+    return [SubfamilyOut.model_validate(sf) for sf in list_subfamilies(db, family_id=family_id, branch=branch)]
 
 
 @router.post("/subfamilies", response_model=SubfamilyOut)

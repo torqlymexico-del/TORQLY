@@ -68,7 +68,7 @@ function fmt(v: string | number) { return `$${Number(v).toLocaleString("es-MX", 
 
 /* ─── Component ──────────────────────────────────────────────────────── */
 
-export default function Services() {
+export default function Services({ branch = "local" }: { branch?: string }) {
   const [families,    setFamilies]    = useState<Family[]>([]);
   const [subfamilies, setSubfamilies] = useState<Subfamily[]>([]);
   const [services,    setServices]    = useState<Service[]>([]);
@@ -92,16 +92,16 @@ export default function Services() {
     setLoading(true); setError("");
     try {
       const [f, sf, s] = await Promise.all([
-        api.get<Family[]>("/catalog/families"),
-        api.get<Subfamily[]>("/catalog/subfamilies"),
-        api.get<Service[]>("/services-catalog/"),
+        api.get<Family[]>("/catalog/families", { params: { branch } }),
+        api.get<Subfamily[]>("/catalog/subfamilies", { params: { branch } }),
+        api.get<Service[]>("/services-catalog/", { params: { branch } }),
       ]);
       setFamilies(f.data.filter(x => x.is_active).sort((a, b) => a.sort_order - b.sort_order));
       setSubfamilies(sf.data.filter(x => x.is_active).sort((a, b) => a.sort_order - b.sort_order));
       setServices(s.data);
     } catch { setError("Error al cargar datos."); }
     finally  { setLoading(false); }
-  }, []);
+  }, [branch]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -121,6 +121,7 @@ export default function Services() {
     if (!duration || duration < 15 || duration > 1440) { setFormError("La duración debe estar entre 15 y 1440 minutos."); return; }
     setSaving(true); setFormError("");
     const payload = {
+      branch,
       name: form.name.trim(), description: form.description.trim() || null,
       base_price: Number(form.base_price) || 0, estimated_duration_minutes: duration,
       service_type: form.service_type, is_active: form.is_active,

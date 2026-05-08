@@ -9,6 +9,7 @@ VehicleType = Literal["sedan", "suv", "camioneta", "van", "moto", "otro"]
 
 class VehicleBase(ORMBaseModel):
     client_id: int | None = None
+    branch: str = Field(default="local", max_length=20)
     brand: str = Field(min_length=1, max_length=80)
     model: str = Field(min_length=1, max_length=80)
     type: VehicleType | None = "sedan"

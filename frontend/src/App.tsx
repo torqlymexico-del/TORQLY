@@ -61,8 +61,8 @@ export default function App() {
           <Route path="/agenda"        element={<Protected><Agenda /></Protected>} />
           <Route path="/pos"           element={<Protected><Pos /></Protected>} />
           <Route path="/clients"       element={<Protected><Clients branch="local" /></Protected>} />
-          <Route path="/vehicles"      element={<Protected><Vehicles /></Protected>} />
-          <Route path="/services"      element={<Protected><Services /></Protected>} />
+          <Route path="/vehicles"      element={<Protected><Vehicles branch="local" /></Protected>} />
+          <Route path="/services"      element={<Protected><Services branch="local" /></Protected>} />
           <Route path="/commissions"   element={<Protected><Commissions /></Protected>} />
           <Route path="/reports"       element={<Protected><Reports /></Protected>} />
           <Route path="/bot"           element={<Protected><Bot /></Protected>} />
@@ -80,7 +80,8 @@ export default function App() {
           <Route path="/domicilios/orders"       element={<Protected><Orders branch="domicilios" /></Protected>} />
           <Route path="/domicilios/cash-sessions"element={<Protected><CashSessions branch="domicilios" /></Protected>} />
           <Route path="/domicilios/clients"      element={<Protected><Clients branch="domicilios" /></Protected>} />
-          <Route path="/domicilios/vehicles"     element={<Protected><Vehicles /></Protected>} />
+          <Route path="/domicilios/vehicles"     element={<Protected><Vehicles branch="domicilios" /></Protected>} />
+          <Route path="/domicilios/services"     element={<Protected><Services branch="domicilios" /></Protected>} />
           <Route path="/domicilios/zones"        element={<Protected><Zones /></Protected>} />
           <Route path="/domicilios/commissions"  element={<Protected><Commissions /></Protected>} />
           <Route path="/domicilios/bot"          element={<Protected><BotConfig /></Protected>} />
