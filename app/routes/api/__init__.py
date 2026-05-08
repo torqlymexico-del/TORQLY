@@ -15,6 +15,7 @@ from app.routes.api import (
     integrations,
     invite_codes,
     notifications,
+    team_chat,
     orders,
     payments,
     payroll,
@@ -39,6 +40,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(exports.router)
 api_router.include_router(integrations.router)
 api_router.include_router(invite_codes.router)
+api_router.include_router(team_chat.router)
 api_router.include_router(notifications.router)
 api_router.include_router(payments.router)
 api_router.include_router(cash_cuts.router)

@@ -3,12 +3,13 @@ import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Car, Wrench, Wallet, BarChart2, Bot,
   Plug, LogOut, Menu, X, ShoppingBag, BadgeDollarSign, DollarSign,
-  Scissors, MapPin, Bell, Building2, Home, Bike, Settings, Loader2, UserPlus,
+  Scissors, MapPin, Bell, Building2, Home, Bike, Settings, Loader2, UserPlus, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
+import TeamChat from "@/components/TeamChat";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
@@ -228,6 +229,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const currentBranch = getBranchFromPath(location.pathname);
   const navItems = NAV[currentBranch];
@@ -316,13 +318,22 @@ export default function Layout({ children }: { children: ReactNode }) {
           </div>
           <Settings className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors shrink-0" />
         </button>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          Cerrar sesión
-        </button>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setChatOpen(true)}
+            className="flex-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Chat
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Salir
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -330,6 +341,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <AccountPanel open={accountOpen} onClose={() => setAccountOpen(false)} />
+      <TeamChat open={chatOpen} onClose={() => setChatOpen(false)} />
       {/* Sidebar desktop */}
       <aside className="hidden md:flex w-56 flex-col border-r border-slate-200 bg-white">
         {sidebar}
