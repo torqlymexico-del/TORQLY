@@ -7,11 +7,13 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database import get_db
 from app.dependencies import get_current_user
+from app.enums import UserRole
 from app.models import User
-from app.schemas.auth import LoginRequest, Token
-from app.schemas.user import UserRead
+from app.schemas.auth import LoginRequest, RegisterRequest, Token
+from app.schemas.user import UserCreate, UserRead
 from app.security import create_access_token
-from app.services.users import authenticate_user
+from app.services.exceptions import ConflictError
+from app.services.users import authenticate_user, create_user
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -32,6 +34,31 @@ def session_login(payload: LoginRequest, response: Response, db: Annotated[Sessi
     user = authenticate_user(db, phone=payload.phone, password=payload.password)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas.")
+    token = create_access_token(user.id, expires_delta=timedelta(minutes=settings.access_token_expire_minutes))
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+    )
+    return UserRead.model_validate(user)
+
+
+@router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+def register(payload: RegisterRequest, response: Response, db: Annotated[Session, Depends(get_db)]) -> UserRead:
+    """Registro público: crea usuario admin y abre sesión automáticamente."""
+    create_payload = UserCreate(
+        name=payload.name,
+        phone=payload.phone,
+        password=payload.password,
+        email=payload.email,
+        role=UserRole.ADMIN,
+    )
+    try:
+        user = create_user(db, create_payload)
+    except ConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     token = create_access_token(user.id, expires_delta=timedelta(minutes=settings.access_token_expire_minutes))
     response.set_cookie(
         key=settings.auth_cookie_name,
