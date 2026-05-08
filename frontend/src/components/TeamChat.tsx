@@ -12,6 +12,7 @@ interface Msg {
   user_name: string;
   user_role: string;
   content: string;
+  branch: string;
   attachment_url: string | null;
   attachment_type: string | null;
   attachment_name: string | null;
@@ -100,7 +101,7 @@ function AttachmentView({ url, type, name, isMe }: {
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
 
-export default function TeamChat({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function TeamChat({ open, onClose, branch = "local" }: { open: boolean; onClose: () => void; branch?: string }) {
   const { user } = useAuth();
   const [msgs, setMsgs]       = useState<Msg[]>([]);
   const [text, setText]       = useState("");
@@ -119,19 +120,19 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
   }, [open]);
 
   /* ── Initial load ── */
-  const loadInitial = useCallback(async () => {
+  const loadInitial = useCallback(async (br: string) => {
     try {
-      const res = await api.get<Msg[]>("/team-chat/", { params: { limit: 60 } });
+      const res = await api.get<Msg[]>("/team-chat/", { params: { limit: 60, branch: br } });
       setMsgs(res.data);
       lastIdRef.current = res.data.length ? res.data[res.data.length - 1].id : 0;
     } catch { /* ignore */ }
   }, []);
 
   /* ── Polling ── */
-  const poll = useCallback(async () => {
+  const poll = useCallback(async (br: string) => {
     if (lastIdRef.current === null) return;
     try {
-      const res = await api.get<Msg[]>("/team-chat/", { params: { since_id: lastIdRef.current } });
+      const res = await api.get<Msg[]>("/team-chat/", { params: { since_id: lastIdRef.current, branch: br } });
       if (res.data.length) {
         setMsgs(prev => [...prev, ...res.data]);
         lastIdRef.current = res.data[res.data.length - 1].id;
@@ -141,11 +142,13 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
 
   useEffect(() => {
     if (!open) return;
-    loadInitial();
+    setMsgs([]);
+    lastIdRef.current = null;
+    loadInitial(branch);
     inputRef.current?.focus();
-    const id = setInterval(poll, 3000);
+    const id = setInterval(() => poll(branch), 3000);
     return () => clearInterval(id);
-  }, [open, loadInitial, poll]);
+  }, [open, branch, loadInitial, poll]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -195,6 +198,7 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
     try {
       const res = await api.post<Msg>("/team-chat/", {
         content,
+        branch,
         attachment_url: att?.url ?? null,
         attachment_type: att?.type ?? null,
         attachment_name: att?.name ?? null,
@@ -233,7 +237,7 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-900">Chat del equipo</p>
-            <p className="text-xs text-slate-400">Solo visible para tu empresa</p>
+            <p className="text-xs text-slate-400 capitalize">{branch}</p>
           </div>
           <button
             onClick={onClose}

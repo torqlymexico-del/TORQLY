@@ -320,7 +320,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         </button>
         <div className="flex gap-1">
           <button
-            onClick={() => setChatOpen(true)}
+            onClick={() => { setChatOpen(true); setOpen(false); }}
             className="flex-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
             <MessageSquare className="h-3.5 w-3.5" />
@@ -341,7 +341,7 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <AccountPanel open={accountOpen} onClose={() => setAccountOpen(false)} />
-      <TeamChat open={chatOpen} onClose={() => setChatOpen(false)} />
+      <TeamChat open={chatOpen} onClose={() => setChatOpen(false)} branch={currentBranch} />
       {/* Sidebar desktop */}
       <aside className="hidden md:flex w-56 flex-col border-r border-slate-200 bg-white">
         {sidebar}

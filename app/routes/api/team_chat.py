@@ -28,8 +28,12 @@ ALLOWED_MIME_EXACT = {
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
+VALID_BRANCHES = {"local", "domicilios", "arrendadoras"}
+
+
 class MessageIn(BaseModel):
     content: str = Field(default="", max_length=2000)
+    branch: str = Field(default="local", max_length=30)
     attachment_url: str | None = None
     attachment_type: str | None = None
     attachment_name: str | None = None
@@ -38,6 +42,8 @@ class MessageIn(BaseModel):
     def check_not_empty(self):
         if not self.content.strip() and not self.attachment_url:
             raise ValueError("Se requiere contenido o adjunto")
+        if self.branch not in VALID_BRANCHES:
+            raise ValueError("Rama inválida")
         return self
 
 
@@ -47,6 +53,7 @@ class MessageOut(BaseModel):
     user_name: str
     user_role: str
     content: str
+    branch: str
     attachment_url: str | None
     attachment_type: str | None
     attachment_name: str | None
@@ -68,6 +75,7 @@ def _to_out(m: TeamMessage, name: str | None = None, role: str | None = None) ->
         user_name=name or (m.user.name if m.user else "?"),
         user_role=role or (m.user.role if m.user else ""),
         content=m.content,
+        branch=m.branch,
         attachment_url=m.attachment_url,
         attachment_type=m.attachment_type,
         attachment_name=m.attachment_name,
@@ -117,22 +125,24 @@ async def upload_attachment(
 def get_messages(
     db: Annotated[Session, Depends(get_db)],
     current_user=Depends(get_current_user),
+    branch: str = Query(default="local"),
     since_id: int | None = Query(default=None),
     limit: int = Query(default=60, le=200),
 ) -> list[MessageOut]:
     company_id = current_company_id(current_user)
+    base = (TeamMessage.company_id == company_id) & (TeamMessage.branch == branch)
 
     if since_id is not None:
         msgs = list(db.scalars(
             select(TeamMessage)
-            .where(TeamMessage.company_id == company_id, TeamMessage.id > since_id)
+            .where(base, TeamMessage.id > since_id)
             .order_by(TeamMessage.id.asc())
             .limit(limit)
         ).all())
     else:
         rows = list(db.scalars(
             select(TeamMessage)
-            .where(TeamMessage.company_id == company_id)
+            .where(base)
             .order_by(TeamMessage.id.desc())
             .limit(limit)
         ).all())
@@ -151,6 +161,7 @@ def send_message(
     msg = TeamMessage(
         company_id=company_id,
         user_id=current_user.id,
+        branch=payload.branch,
         content=payload.content.strip(),
         attachment_url=payload.attachment_url,
         attachment_type=payload.attachment_type,
