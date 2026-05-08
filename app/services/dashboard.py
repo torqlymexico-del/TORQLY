@@ -5,8 +5,9 @@ from datetime import date
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.enums import AppointmentStatus, IntegrationStatus
+from app.enums import AppointmentStatus, IntegrationStatus, OrderPaymentStatus, OrderStatus
 from app.models import Client, Commission, IntegrationLog, InventoryProduct, Payment, ServiceCatalog, User, Vehicle
+from app.models.service_order import ServiceOrder
 from app.services.appointments import agenda_for_day
 from app.services.company_scope import created_by_company_clause
 from app.services.payments import list_pending_charge_appointments
@@ -94,6 +95,75 @@ def dashboard_snapshot(session: Session, *, target_date: date, company_id: int |
         ).all()
     )
 
+    # ── Orders (ServiceOrder) stats ───────────────────────────────────────────
+    _orders_base = (
+        select(ServiceOrder)
+        .where(ServiceOrder.service_date == target_date)
+    )
+    if company_id is not None:
+        _orders_base = _orders_base.where(ServiceOrder.company_id == company_id)
+
+    today_orders = list(session.scalars(_orders_base.order_by(ServiceOrder.daily_sequence.asc())).all())
+
+    _paid_statuses = [
+        OrderPaymentStatus.PAID.value,
+        OrderPaymentStatus.PARTIAL.value,
+        OrderPaymentStatus.CREDIT.value,
+        OrderPaymentStatus.COURTESY.value,
+    ]
+
+    orders_revenue_q = select(func.coalesce(func.sum(ServiceOrder.total), 0)).where(
+        ServiceOrder.service_date == target_date,
+        ServiceOrder.payment_status.in_(_paid_statuses),
+        ServiceOrder.status != OrderStatus.CANCELLED.value,
+    )
+    if company_id is not None:
+        orders_revenue_q = orders_revenue_q.where(ServiceOrder.company_id == company_id)
+    orders_revenue = session.scalar(orders_revenue_q) or 0
+
+    def _count_status(status: str) -> int:
+        return sum(1 for o in today_orders if o.status == status)
+
+    orders_pending_payment = sum(
+        1 for o in today_orders
+        if o.payment_status == OrderPaymentStatus.PENDING.value and o.status != OrderStatus.CANCELLED.value
+    )
+
+    # Per-washer load from today's orders
+    washer_load: dict[int, dict] = {}
+    for order in today_orders:
+        if order.status == OrderStatus.CANCELLED.value:
+            continue
+        for w in order.washers:
+            bucket = washer_load.setdefault(w.user_id, {
+                "user_id": w.user_id,
+                "name": w.user.name if w.user else f"#{w.user_id}",
+                "total": 0,
+                "completed": 0,
+            })
+            bucket["total"] += 1
+            if order.status in (OrderStatus.DELIVERED.value, OrderStatus.READY.value):
+                bucket["completed"] += 1
+
+    orders_today_summary = [
+        {
+            "id": o.id,
+            "daily_sequence": o.daily_sequence,
+            "status": o.status,
+            "payment_status": o.payment_status,
+            "total": str(o.total),
+            "vehicle": {
+                "plate": o.vehicle.plate if o.vehicle else None,
+                "brand": o.vehicle.brand if o.vehicle else None,
+                "model": o.vehicle.model if o.vehicle else None,
+                "color": o.vehicle.color if o.vehicle else None,
+            } if o.vehicle_id else None,
+            "client_name": o.client.name if o.client else None,
+            "washer_names": [w.user.name for w in o.washers if w.user],
+        }
+        for o in today_orders
+    ]
+
     return {
         "totals": {
             "users": session.scalar(select(func.count(User.id)).where(User.is_active.is_(True)).where(User.company_id == company_id if company_id is not None else True)) or 0,
@@ -112,4 +182,16 @@ def dashboard_snapshot(session: Session, *, target_date: date, company_id: int |
         "operator_load": sorted(operator_map.values(), key=lambda item: (-item["total"], item["operator_name"])),
         "low_stock_alerts": low_stock_alerts,
         "recent_integration_errors": recent_integration_errors,
+        "orders": {
+            "total_today": len(today_orders),
+            "en_cola":    _count_status(OrderStatus.QUEUED.value),
+            "en_proceso": _count_status(OrderStatus.IN_PROGRESS.value),
+            "listo":      _count_status(OrderStatus.READY.value),
+            "entregado":  _count_status(OrderStatus.DELIVERED.value),
+            "cancelado":  _count_status(OrderStatus.CANCELLED.value),
+            "revenue_today": to_money(orders_revenue),
+            "pending_payment": orders_pending_payment,
+        },
+        "orders_today": orders_today_summary,
+        "washer_load": sorted(washer_load.values(), key=lambda x: (-x["total"], x["name"])),
     }
