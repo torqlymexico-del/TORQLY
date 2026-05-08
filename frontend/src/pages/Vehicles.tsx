@@ -18,7 +18,7 @@ interface Client {
 
 interface Vehicle {
   id: number;
-  client_id: number;
+  client_id: number | null;
   brand: string;
   model: string;
   year: number | null;
@@ -45,7 +45,7 @@ function emptyForm(): VehicleForm {
 
 function formFromVehicle(v: Vehicle): VehicleForm {
   return {
-    client_id: String(v.client_id),
+    client_id: v.client_id != null ? String(v.client_id) : "",
     brand:     v.brand,
     model:     v.model,
     year:      v.year != null ? String(v.year) : "",
@@ -135,14 +135,14 @@ export default function Vehicles({ branch = "local" }: { branch?: string }) {
   /* ── Save ── */
 
   async function handleSave() {
-    if (!form.client_id || !form.brand.trim() || !form.model.trim()) {
-      setFormError("Cliente, marca y modelo son obligatorios.");
+    if (!form.brand.trim() || !form.model.trim()) {
+      setFormError("Marca y modelo son obligatorios.");
       return;
     }
     setSaving(true);
     setFormError("");
     const payload = {
-      client_id: Number(form.client_id),
+      client_id: form.client_id ? Number(form.client_id) : null,
       branch,
       brand:     form.brand.trim(),
       model:     form.model.trim(),
@@ -187,7 +187,7 @@ export default function Vehicles({ branch = "local" }: { branch?: string }) {
 
   const filtered = vehicles.filter(v => {
     const q = query.toLowerCase();
-    const clientName = (clientMap.get(v.client_id) ?? "").toLowerCase();
+    const clientName = (v.client_id != null ? (clientMap.get(v.client_id) ?? "") : "").toLowerCase();
     return (
       v.brand.toLowerCase().includes(q) ||
       v.model.toLowerCase().includes(q) ||
@@ -259,7 +259,7 @@ export default function Vehicles({ branch = "local" }: { branch?: string }) {
                   <td className="px-4 py-3 font-medium text-slate-900">{vehicleLabel(v)}</td>
                   <td className="px-4 py-3 font-mono text-slate-600">{v.plates ?? "—"}</td>
                   <td className="px-4 py-3 text-slate-500 capitalize">{v.color ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-600">{clientMap.get(v.client_id) ?? `#${v.client_id}`}</td>
+                  <td className="px-4 py-3 text-slate-600">{v.client_id ? (clientMap.get(v.client_id) ?? "—") : "Sin cliente"}</td>
                   <td className="px-4 py-3">
                     <Badge variant={v.is_active ? "success" : "secondary"}>
                       {v.is_active ? "Activo" : "Inactivo"}
@@ -299,13 +299,13 @@ export default function Vehicles({ branch = "local" }: { branch?: string }) {
               <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{formError}</div>
             )}
 
-            <Field label="Cliente" required>
+            <Field label="Cliente (opcional)">
               <select
                 className={inputCls}
                 value={form.client_id}
                 onChange={e => set("client_id", e.target.value)}
               >
-                <option value="">Seleccionar cliente…</option>
+                <option value="">Sin cliente</option>
                 {clients.map(c => (
                   <option key={c.id} value={c.id}>{c.name} — {c.phone}</option>
                 ))}
