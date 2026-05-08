@@ -287,7 +287,7 @@ export default function ServiceEntry({ branch = "local" }: { branch?: string }) 
       const { data: order } = await api.post("/orders/", {
         client_id: finalClientId,
         vehicle_id: finalVehicleId,
-        branch,
+        is_domicilio: branch === "domicilios",
         items: cart.map(i => ({ catalog_id: i.catalog_id, unit_price: i.unit_price, quantity: i.quantity })),
         notes: orderNotes.trim() || null,
       });
