@@ -152,7 +152,7 @@ function InputBar({ onSend, sending, uploading, locating, pending, onClearPendin
   onSend: () => void; sending: boolean; uploading: boolean; locating: boolean;
   pending: PendingAttachment | null; onClearPending: () => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onLocation: () => void; inputRef: React.RefObject<HTMLInputElement>;
+  onLocation: () => void; inputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   const [text, setText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
