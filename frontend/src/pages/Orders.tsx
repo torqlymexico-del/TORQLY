@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
-  Loader2, Plus, ShoppingBag, ChevronDown, ChevronUp,
-  Trash2, Search, X,
+  Loader2, Plus, ShoppingBag, ChevronDown, ChevronUp, Trash2, Search, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle,
 } from "@/components/ui/dialog";
@@ -57,9 +55,9 @@ const STATUS_LABELS: Record<string, string> = {
   entregado: "Entregado", cancelado: "Cancelado",
 };
 const STATUS_NEXT: Record<string, { label: string; value: string }> = {
-  en_cola:   { label: "Iniciar",   value: "en_proceso" },
-  en_proceso:{ label: "Listo",     value: "listo" },
-  listo:     { label: "Entregar",  value: "entregado" },
+  en_cola:    { label: "Iniciar",  value: "en_proceso" },
+  en_proceso: { label: "Listo",    value: "listo" },
+  listo:      { label: "Entregar", value: "entregado" },
 };
 const STATUS_COLORS: Record<string, string> = {
   en_cola:    "bg-amber-100 text-amber-800",
@@ -78,6 +76,10 @@ const PAY_COLORS: Record<string, string> = {
 const PAY_LABELS: Record<string, string> = {
   pendiente: "Pendiente", pagado: "Pagado", parcial: "Parcial",
   credito: "Crédito", cortesia: "Cortesía",
+};
+const PAY_METHOD_LABELS: Record<string, string> = {
+  efectivo: "Efectivo", tarjeta: "Tarjeta", transferencia: "Transferencia",
+  deposito: "Depósito", credito: "Crédito", cortesia: "Cortesía",
 };
 const PAY_METHODS = [
   { value: "efectivo", label: "Efectivo" },
@@ -99,7 +101,7 @@ function fmt(v: string | number | null | undefined) {
 function normalize(s: string) {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w\s#]/g, " ").replace(/\s+/g, " ").trim();
 }
-const inputCls = "w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900";
+const inp = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900";
 type NewItemRow = { catalog_id: number | null; custom_name: string; unit_price: string; quantity: number };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -123,6 +125,16 @@ export default function Orders() {
   // Expanded card
   const [expanded, setExpanded] = useState<number | null>(null);
 
+  // Edit mode (inline per card)
+  const [editOrder, setEditOrder] = useState<number | null>(null);
+  const [editSection, setEditSection] = useState<string | null>(null);
+  const [editWasherIds, setEditWasherIds] = useState<Set<number>>(new Set());
+  const [editTotal, setEditTotal] = useState("");
+  const [editStatus, setEditStatus] = useState("");
+  const [editPayMethod, setEditPayMethod] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [cancelReason, setCancelReason] = useState("");
+
   // New order dialog
   const [newDlg, setNewDlg] = useState(false);
   const [newClientId, setNewClientId] = useState("");
@@ -138,27 +150,15 @@ export default function Orders() {
   const [payMethod, setPayMethod] = useState("efectivo");
   const [tendered, setTendered] = useState("");
 
-  // Washer dialog
-  const [washerDlg, setWasherDlg] = useState(false);
-  const [washerOrder, setWasherOrder] = useState<Order | null>(null);
-  const [washerRows, setWasherRows] = useState<{ user_id: string; commission_percent: string }[]>([]);
-
-  // Cancel dialog
-  const [cancelDlg, setCancelDlg] = useState(false);
-  const [cancelOrder, setCancelOrder] = useState<Order | null>(null);
-  const [cancelReason, setCancelReason] = useState("");
-
   // ── Load ──────────────────────────────────────────────────────────────────
 
   const loadOrders = useCallback(async () => {
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const params: Record<string, string> = {};
       const today = todayStr();
       if (scope === "today") { params.date_from = today; params.date_to = today; }
       else if (scope === "date") { params.date_from = selectedDate; params.date_to = selectedDate; }
-      // history = no date filter
       const res = await api.get<Order[]>("/orders/", { params });
       setOrders(res.data);
     } catch { setError("Error al cargar órdenes."); }
@@ -174,19 +174,15 @@ export default function Orders() {
       api.get<ServiceCatalog[]>("/services-catalog/"),
       api.get<Operator[]>("/payroll/operators"),
     ]).then(([c, v, s, o]) => {
-      setClients(c.data); setVehicles(v.data);
-      setServices(s.data); setOperators(o.data);
+      setClients(c.data); setVehicles(v.data); setServices(s.data); setOperators(o.data);
     }).catch(() => {});
   }, []);
 
-  // "/" shortcut to focus search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      if (e.key === "/" && !["INPUT","TEXTAREA","SELECT"].includes(target.tagName)) {
-        e.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
+      if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) {
+        e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select();
       }
     };
     document.addEventListener("keydown", onKey);
@@ -202,38 +198,68 @@ export default function Orders() {
   function folio(o: Order) {
     if (!o.daily_sequence) return `#${o.id}`;
     const day = o.service_date ? o.service_date.slice(5).replace("-", "/") : "";
-    return day ? `${day} · #${String(o.daily_sequence).padStart(3,"0")}` : `#${String(o.daily_sequence).padStart(3,"0")}`;
+    return day ? `${day} · #${String(o.daily_sequence).padStart(3, "0")}` : `#${String(o.daily_sequence).padStart(3, "0")}`;
   }
 
   function orderIndex(o: Order) {
     const v = getVehicle(o.vehicle_id);
-    const parts = [
+    return normalize([
       folio(o), String(o.id), o.service_date ?? "",
       clientName(o.client_id), v?.plate ?? "", v?.brand ?? "", v?.model ?? "", v?.color ?? "",
       o.washers.map(w => opName(w.user_id)).join(" "),
       STATUS_LABELS[o.status] ?? o.status,
       PAY_LABELS[o.payment_status] ?? o.payment_status,
-    ];
-    return normalize(parts.join(" "));
+    ].join(" "));
   }
 
-  // ── Filtered + searched orders ─────────────────────────────────────────────
+  // ── Filtered orders ───────────────────────────────────────────────────────
 
   const filtered = useMemo(() => {
     let list = [...orders];
-    if (filter === "active") list = list.filter(o => ["en_cola","en_proceso","listo"].includes(o.status));
+    if (filter === "active") list = list.filter(o => ["en_cola", "en_proceso", "listo"].includes(o.status));
     else if (filter === "done") list = list.filter(o => o.status === "entregado");
     else if (filter === "paid") list = list.filter(o => o.payment_status === "pagado");
     else if (filter === "pending_pay") list = list.filter(o => o.payment_status === "pendiente" && o.status !== "cancelado");
     const q = normalize(search);
     if (q) list = list.filter(o => orderIndex(o).includes(q));
     return list;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders, filter, search, clients, vehicles, operators]);
 
-  const canCharge = (o: Order) =>
-    o.status !== "cancelado" &&
-    !["pagado","credito","cortesia"].includes(o.payment_status);
+  const isPaid = (o: Order) => ["pagado", "credito", "cortesia"].includes(o.payment_status);
+  const canCharge = (o: Order) => o.status !== "cancelado" && !isPaid(o);
+
+  // ── Edit mode ─────────────────────────────────────────────────────────────
+
+  function openEdit(o: Order) {
+    setEditOrder(o.id);
+    setEditSection(null);
+    setEditWasherIds(new Set(o.washers.map(w => w.user_id)));
+    setEditTotal(Number(o.total).toFixed(2));
+    setEditStatus(o.status);
+    setEditPayMethod(o.payment_method ?? "efectivo");
+    setEditReason("");
+    setCancelReason("");
+  }
+
+  function closeEdit() {
+    setEditOrder(null);
+    setEditSection(null);
+  }
+
+  function toggleSection(name: string) {
+    setEditSection(prev => prev === name ? null : name);
+    setEditReason("");
+    setCancelReason("");
+  }
+
+  function toggleExpanded(id: number) {
+    setExpanded(prev => {
+      if (prev === id) { closeEdit(); return null; }
+      closeEdit();
+      return id;
+    });
+  }
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -244,6 +270,67 @@ export default function Orders() {
       const res = await api.patch<Order>(`/orders/${o.id}/status`, { status: next.value });
       setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
     } catch { setError("Error al actualizar estado."); }
+  }
+
+  async function handleEditWashers(o: Order) {
+    if (editWasherIds.size === 0) { setError("Selecciona al menos un lavador."); return; }
+    setSaving(true);
+    try {
+      const washers = Array.from(editWasherIds).map(uid => ({
+        user_id: uid,
+        commission_percent: parseFloat(operators.find(op => op.id === uid)?.commission_percentage ?? "0") || 0,
+      }));
+      const res = await api.put<Order>(`/orders/${o.id}/washers`, { washers });
+      setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
+      setEditSection(null);
+    } catch { setError("Error al asignar lavadores."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleEditTotal(o: Order) {
+    setSaving(true);
+    try {
+      const res = await api.patch<Order>(`/orders/${o.id}/total`, { total: parseFloat(editTotal), reason: editReason || null });
+      setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
+      setEditSection(null);
+    } catch { setError("Error al actualizar el monto."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleEditStatus(o: Order) {
+    setSaving(true);
+    try {
+      const res = await api.patch<Order>(`/orders/${o.id}/status`, { status: editStatus });
+      setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
+      setEditSection(null);
+    } catch { setError("Error al actualizar estado."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleEditPayMethod(o: Order) {
+    setSaving(true);
+    try {
+      const isCourtesy = editPayMethod === "cortesia";
+      const isCredit = editPayMethod === "credito";
+      const res = await api.patch<Order>(`/orders/${o.id}/payment`, {
+        payment_method: editPayMethod,
+        payment_status: isCourtesy ? "cortesia" : isCredit ? "credito" : "pagado",
+        discount_amount: 0,
+      });
+      setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
+      setEditSection(null);
+    } catch { setError("Error al cambiar método de pago."); }
+    finally { setSaving(false); }
+  }
+
+  async function handleCancel(o: Order) {
+    setSaving(true);
+    try {
+      const res = await api.patch<Order>(`/orders/${o.id}/status`, { status: "cancelado", cancellation_reason: cancelReason });
+      setOrders(prev => prev.map(x => x.id === o.id ? res.data : x));
+      closeEdit();
+    } catch { setError("Error al cancelar la orden."); }
+    finally { setSaving(false); }
   }
 
   async function handleCreateOrder() {
@@ -285,32 +372,6 @@ export default function Orders() {
     finally { setSaving(false); }
   }
 
-  async function handleAssignWashers() {
-    if (!washerOrder) return;
-    setSaving(true);
-    try {
-      const washers = washerRows.filter(w => w.user_id).map(w => ({
-        user_id: parseInt(w.user_id),
-        commission_percent: parseFloat(w.commission_percent) || 0,
-      }));
-      const res = await api.put<Order>(`/orders/${washerOrder.id}/washers`, { washers });
-      setOrders(prev => prev.map(o => o.id === washerOrder.id ? res.data : o));
-      setWasherDlg(false);
-    } catch { setError("Error al asignar lavadores."); }
-    finally { setSaving(false); }
-  }
-
-  async function handleCancel() {
-    if (!cancelOrder) return;
-    setSaving(true);
-    try {
-      const res = await api.patch<Order>(`/orders/${cancelOrder.id}/status`, { status: "cancelado", notes: cancelReason || undefined });
-      setOrders(prev => prev.map(o => o.id === cancelOrder.id ? res.data : o));
-      setCancelDlg(false); setCancelOrder(null); setCancelReason("");
-    } catch { setError("Error al cancelar la orden."); }
-    finally { setSaving(false); }
-  }
-
   async function handleRemoveItem(order: Order, itemId: number) {
     try {
       const res = await api.delete<Order>(`/orders/${order.id}/items/${itemId}`);
@@ -318,11 +379,7 @@ export default function Orders() {
     } catch { setError("Error al eliminar ítem."); }
   }
 
-  // ── Cobrar helpers ────────────────────────────────────────────────────────
-
-  const change = payOrder
-    ? Math.max(0, (parseFloat(tendered) || 0) - Number(payOrder.total))
-    : 0;
+  const change = payOrder ? Math.max(0, (parseFloat(tendered) || 0) - Number(payOrder.total)) : 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -352,7 +409,12 @@ export default function Orders() {
         </Button>
       </div>
 
-      {error && <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError("")} className="text-red-400 hover:text-red-600 ml-2"><X className="h-4 w-4" /></button>
+        </div>
+      )}
 
       {/* Scope tabs */}
       <div className="flex flex-wrap gap-2">
@@ -364,7 +426,6 @@ export default function Orders() {
         ))}
       </div>
 
-      {/* Date picker for "date" scope */}
       {scope === "date" && (
         <div className="flex items-center gap-3">
           <input type="date" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium"
@@ -419,17 +480,27 @@ export default function Orders() {
             const v = getVehicle(o.vehicle_id);
             const washerNames = o.washers.map(w => opName(w.user_id)).join(", ");
             const isOpen = expanded === o.id;
+            const inEditMode = editOrder === o.id;
             const isCancelled = o.status === "cancelado";
-            const isClosed = ["pagado","credito","cortesia"].includes(o.payment_status);
+            const isClosed = isPaid(o);
+
+            // Which jump links to show
+            const showLavadores = !isCancelled && !isClosed;
+            const showMonto = !isClosed && !isCancelled;
+            const showEstado = !isCancelled;
+            const showMetodoPago = isClosed && !isCancelled;
+            const showCancelar = !isCancelled && !isClosed;
+            const hasEditOptions = showLavadores || showMonto || showEstado || showMetodoPago || showCancelar;
 
             return (
               <article key={o.id} className={`bg-white border rounded-2xl shadow-sm overflow-hidden ${isOpen ? "border-blue-200 ring-2 ring-blue-100" : "border-slate-100"}`}>
+
                 {/* Card header */}
                 <div
                   className="flex items-center gap-3 px-5 py-4 cursor-pointer hover:bg-slate-50 transition-colors select-none"
-                  onClick={() => setExpanded(isOpen ? null : o.id)}
+                  onClick={() => toggleExpanded(o.id)}
                 >
-                  {/* Left: vehicle + meta */}
+                  {/* Vehicle + meta */}
                   <div className="flex-1 min-w-0">
                     <div className="font-black text-slate-900 text-base leading-tight truncate mb-1.5">
                       {folio(o)} · {v ? `${v.brand ?? ""} ${v.model ?? ""}`.trim() || "Vehículo" : "Vehículo"}
@@ -439,18 +510,14 @@ export default function Orders() {
                         <span className="font-mono font-black bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-xs">{v.plate}</span>
                       )}
                       {v?.color && <span className="text-slate-400">{v.color}</span>}
-                      {washerNames ? (
-                        <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold text-xs">{washerNames}</span>
-                      ) : (
-                        <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-semibold text-xs">Sin asignar</span>
-                      )}
-                      {clientName(o.client_id) && (
-                        <span className="text-slate-400">{clientName(o.client_id)}</span>
-                      )}
+                      {washerNames
+                        ? <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-semibold text-xs">{washerNames}</span>
+                        : <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-semibold text-xs">Sin asignar</span>}
+                      {clientName(o.client_id) && <span className="text-slate-400">{clientName(o.client_id)}</span>}
                     </div>
                   </div>
 
-                  {/* Right: badges + total + cobrar */}
+                  {/* Badges + total */}
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <div className="flex items-center gap-1.5">
                       <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_COLORS[o.status] ?? "bg-slate-100 text-slate-600"}`}>
@@ -463,7 +530,7 @@ export default function Orders() {
                     <span className="font-black text-slate-900 text-xl leading-none">{fmt(o.total)}</span>
                   </div>
 
-                  {/* Cobrar button */}
+                  {/* Cobrar / status chip */}
                   {canCharge(o) && (
                     <button
                       className="shrink-0 font-black text-white text-sm px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 transition-colors whitespace-nowrap"
@@ -488,10 +555,10 @@ export default function Orders() {
                 {isOpen && (
                   <div className="border-t border-slate-100 px-5 py-4 space-y-4" onClick={e => e.stopPropagation()}>
 
-                    {/* Quick status actions */}
-                    {!isCancelled && !isClosed && (
-                      <div className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-xl px-4 py-3">
-                        {STATUS_NEXT[o.status] && (
+                    {/* Quick action bar */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap bg-slate-50 rounded-xl px-4 py-3">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {!isCancelled && STATUS_NEXT[o.status] && (
                           <button
                             onClick={() => advanceStatus(o)}
                             className="px-4 py-2 rounded-full bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors"
@@ -499,20 +566,20 @@ export default function Orders() {
                             {STATUS_NEXT[o.status].label}
                           </button>
                         )}
-                        <button
-                          onClick={() => { setWasherOrder(o); setWasherRows(o.washers.length > 0 ? o.washers.map(w => ({ user_id: String(w.user_id), commission_percent: String(w.commission_percent) })) : [{ user_id: "", commission_percent: "0" }]); setWasherDlg(true); }}
-                          className="px-4 py-2 rounded-full border border-slate-200 text-sm font-bold text-slate-700 hover:border-slate-400 transition-colors bg-white"
-                        >
-                          Lavadores
-                        </button>
-                        <button
-                          onClick={() => { setCancelOrder(o); setCancelReason(""); setCancelDlg(true); }}
-                          className="px-4 py-2 rounded-full border border-red-200 text-sm font-bold text-red-600 hover:bg-red-50 transition-colors bg-white ml-auto"
-                        >
-                          Cancelar
-                        </button>
+                        {isClosed && !isCancelled && (
+                          <span className="text-sm text-slate-400 font-medium">Servicio cerrado</span>
+                        )}
+                        {isCancelled && (
+                          <span className="text-sm text-red-500 font-medium">Orden cancelada</span>
+                        )}
                       </div>
-                    )}
+                      <button
+                        onClick={() => inEditMode ? closeEdit() : openEdit(o)}
+                        className={`px-4 py-2 rounded-full text-sm font-bold transition-colors ${inEditMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-slate-900 text-white hover:bg-slate-700"}`}
+                      >
+                        {inEditMode ? "Cerrar edición" : "Editar"}
+                      </button>
+                    </div>
 
                     {/* Service items */}
                     <div className="rounded-xl bg-slate-50 p-4">
@@ -531,9 +598,11 @@ export default function Orders() {
                               </div>
                               <div className="flex items-center gap-3">
                                 <span className="text-sm font-bold text-blue-700">{fmt(item.unit_price)}</span>
-                                <button onClick={() => handleRemoveItem(o, item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                {!isClosed && !isCancelled && (
+                                  <button onClick={() => handleRemoveItem(o, item.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           ))}
@@ -544,8 +613,183 @@ export default function Orders() {
                       )}
                     </div>
 
-                    {/* Washers */}
-                    {o.washers.length > 0 && (
+                    {/* ── Edit mode ── */}
+                    {inEditMode && (
+                      <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4 space-y-3">
+                        {/* Guide */}
+                        <div>
+                          <h3 className="text-sm font-black text-slate-900 mb-0.5">Modo de edición</h3>
+                          <p className="text-xs text-slate-500 mb-3">Selecciona qué deseas modificar.</p>
+                          {hasEditOptions ? (
+                            <div className="flex flex-wrap gap-2">
+                              {showLavadores && (
+                                <button onClick={() => toggleSection("lavadores")}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${editSection === "lavadores" ? "bg-blue-600 text-white border-transparent" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"}`}>
+                                  Lavadores
+                                </button>
+                              )}
+                              {showMonto && (
+                                <button onClick={() => toggleSection("monto")}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${editSection === "monto" ? "bg-blue-600 text-white border-transparent" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"}`}>
+                                  Monto
+                                </button>
+                              )}
+                              {showEstado && (
+                                <button onClick={() => toggleSection("estado")}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${editSection === "estado" ? "bg-blue-600 text-white border-transparent" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"}`}>
+                                  Estado
+                                </button>
+                              )}
+                              {showMetodoPago && (
+                                <button onClick={() => toggleSection("pago")}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${editSection === "pago" ? "bg-blue-600 text-white border-transparent" : "bg-white border-blue-200 text-blue-700 hover:border-blue-400"}`}>
+                                  Método de pago
+                                </button>
+                              )}
+                              {showCancelar && (
+                                <button onClick={() => toggleSection("cancelar")}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${editSection === "cancelar" ? "bg-red-600 text-white border-transparent" : "bg-white border-red-200 text-red-600 hover:border-red-400"}`}>
+                                  Cancelar
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-slate-400">No hay opciones de edición disponibles.</p>
+                          )}
+                        </div>
+
+                        {/* Lavadores section */}
+                        {editSection === "lavadores" && showLavadores && (
+                          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-800">Lavadores</h4>
+                              <p className="text-xs text-slate-400">Actual: {washerNames || "Sin asignar"}</p>
+                            </div>
+                            {operators.length === 0 ? (
+                              <p className="text-sm text-slate-400">No hay operadores activos.</p>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-2">
+                                {operators.map(op => (
+                                  <label key={op.id}
+                                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${editWasherIds.has(op.id) ? "bg-blue-50 border-blue-300" : "bg-slate-50 border-slate-200 hover:border-slate-300"}`}>
+                                    <input type="checkbox" className="accent-blue-600" checked={editWasherIds.has(op.id)}
+                                      onChange={e => setEditWasherIds(prev => {
+                                        const next = new Set(prev);
+                                        e.target.checked ? next.add(op.id) : next.delete(op.id);
+                                        return next;
+                                      })} />
+                                    <div>
+                                      <div className="text-sm font-semibold text-slate-800">{op.name}</div>
+                                      <div className="text-xs text-slate-400">{op.commission_percentage}% comisión</div>
+                                    </div>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex justify-end">
+                              <Button size="sm" onClick={() => handleEditWashers(o)} disabled={saving || editWasherIds.size === 0}>
+                                {saving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Guardar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Monto section */}
+                        {editSection === "monto" && showMonto && (
+                          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-800">Monto del vehículo</h4>
+                              <p className="text-xs text-slate-400">Actual: {fmt(o.total)}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500">Nuevo monto</label>
+                                <input type="number" min="0" step="0.01" className={inp} value={editTotal}
+                                  onChange={e => setEditTotal(e.target.value)} />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold text-slate-500">Motivo</label>
+                                <input className={inp} value={editReason} onChange={e => setEditReason(e.target.value)}
+                                  placeholder="Razón del ajuste" />
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <Button size="sm" onClick={() => handleEditTotal(o)} disabled={saving || !editTotal.trim()}>
+                                {saving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Guardar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Estado section */}
+                        {editSection === "estado" && showEstado && (
+                          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                            <h4 className="text-sm font-bold text-slate-800">Cambiar estado</h4>
+                            <div className="flex gap-2 flex-wrap items-end">
+                              <div className="flex-1 min-w-0">
+                                <select className={inp} value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                                  {Object.entries(STATUS_LABELS).filter(([k]) => k !== "cancelado").map(([k, v]) => (
+                                    <option key={k} value={k}>{v}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <Button size="sm" onClick={() => handleEditStatus(o)} disabled={saving}>
+                                {saving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Actualizar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Método de pago section */}
+                        {editSection === "pago" && showMetodoPago && (
+                          <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
+                            <div>
+                              <h4 className="text-sm font-bold text-slate-800">Cambiar método de pago</h4>
+                              <p className="text-xs text-slate-400">
+                                Actual: {PAY_METHOD_LABELS[o.payment_method ?? ""] ?? o.payment_method ?? "—"}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 flex-wrap items-end">
+                              <div className="flex-1 min-w-0">
+                                <select className={inp} value={editPayMethod} onChange={e => setEditPayMethod(e.target.value)}>
+                                  {PAY_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                </select>
+                              </div>
+                              <Button size="sm" onClick={() => handleEditPayMethod(o)} disabled={saving}>
+                                {saving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Guardar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Cancelar section */}
+                        {editSection === "cancelar" && showCancelar && (
+                          <div className="bg-white rounded-xl border border-red-200 p-4 space-y-3">
+                            <h4 className="text-sm font-bold text-red-700">Cancelar orden #{o.id}</h4>
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold text-slate-500">
+                                Motivo <span className="text-red-500">*</span>
+                              </label>
+                              <input
+                                className={`${inp} border-red-200 focus:ring-red-400`}
+                                value={cancelReason}
+                                onChange={e => setCancelReason(e.target.value)}
+                                placeholder="Describe el motivo de la cancelación"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <Button size="sm" variant="destructive"
+                                onClick={() => handleCancel(o)} disabled={saving || !cancelReason.trim()}>
+                                {saving && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}Cancelar orden
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Washers summary (when NOT in edit mode) */}
+                    {!inEditMode && o.washers.length > 0 && (
                       <div className="rounded-xl bg-slate-50 px-4 py-3">
                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Lavadores</h3>
                         <div className="flex flex-wrap gap-2">
@@ -563,7 +807,9 @@ export default function Orders() {
                     {(o.notes || o.is_domicilio) && (
                       <div className="flex flex-wrap gap-3 text-sm text-slate-500">
                         {o.notes && <span>Nota: {o.notes}</span>}
-                        {o.is_domicilio && o.delivery_address && <span className="text-blue-500">📍 {o.delivery_address}</span>}
+                        {o.is_domicilio && o.delivery_address && (
+                          <span className="text-blue-500">📍 {o.delivery_address}</span>
+                        )}
                       </div>
                     )}
                   </div>
@@ -574,111 +820,52 @@ export default function Orders() {
         </div>
       )}
 
-      {/* ── New order dialog ── */}
-      <Dialog open={newDlg} onOpenChange={o => { if (!o) setNewDlg(false); }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>Nueva orden de servicio</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-            {formError && <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{formError}</div>}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Cliente</label>
-                <select className={inputCls} value={newClientId} onChange={e => { setNewClientId(e.target.value); setNewVehicleId(""); }}>
-                  <option value="">Sin cliente</option>
-                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700">Vehículo</label>
-                <select className={inputCls} value={newVehicleId} onChange={e => setNewVehicleId(e.target.value)}>
-                  <option value="">Sin vehículo</option>
-                  {vehicles.filter(v => !newClientId || !v.client_id || v.client_id === parseInt(newClientId))
-                    .map(v => <option key={v.id} value={v.id}>{[v.plate, v.brand, v.model].filter(Boolean).join(" ")}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Notas</label>
-              <input className={inputCls} value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Opcional" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-700">Servicios</label>
-                <Button size="sm" variant="outline" type="button"
-                  onClick={() => setNewItems(prev => [...prev, { catalog_id: null, custom_name: "", unit_price: "", quantity: 1 }])}>
-                  <Plus className="h-3 w-3 mr-1" /> Agregar
-                </Button>
-              </div>
-              {newItems.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-5 space-y-1">
-                    <label className="text-xs text-slate-500">Catálogo</label>
-                    <select className={inputCls} value={item.catalog_id ?? ""} onChange={e => {
-                      const svc = services.find(s => s.id === parseInt(e.target.value));
-                      setNewItems(prev => prev.map((it, i) => i === idx
-                        ? { ...it, catalog_id: svc?.id ?? null, custom_name: "", unit_price: svc?.base_price ?? it.unit_price }
-                        : it));
-                    }}>
-                      <option value="">Personalizado</option>
-                      {services.map(s => <option key={s.id} value={s.id}>{s.name} — {fmt(s.base_price)}</option>)}
-                    </select>
-                  </div>
-                  {!item.catalog_id && (
-                    <div className="col-span-3 space-y-1">
-                      <label className="text-xs text-slate-500">Nombre</label>
-                      <input className={inputCls} value={item.custom_name} placeholder="Descripción"
-                        onChange={e => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, custom_name: e.target.value } : it))} />
-                    </div>
-                  )}
-                  <div className={`${item.catalog_id ? "col-span-6" : "col-span-3"} space-y-1`}>
-                    <label className="text-xs text-slate-500">Precio</label>
-                    <input type="number" min="0" step="0.01" className={inputCls} value={item.unit_price} placeholder="0.00"
-                      onChange={e => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: e.target.value } : it))} />
-                  </div>
-                  <button type="button" className="col-span-1 text-red-400 hover:text-red-600 pb-2 flex justify-center"
-                    onClick={() => setNewItems(prev => prev.filter((_, i) => i !== idx))}>
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewDlg(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleCreateOrder} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crear orden
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* ── Payment dialog ── */}
       <Dialog open={payDlg} onOpenChange={o => { if (!o) setPayDlg(false); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Cobrar servicio</span>
-              <span className="text-2xl font-black text-slate-900">{fmt(payOrder?.total)}</span>
-            </DialogTitle>
+            <DialogTitle>Cobrar servicio</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Vehicle + total card */}
             {payOrder && (
-              <div className="text-xs text-slate-500 -mt-2">{folio(payOrder)} · {getVehicle(payOrder.vehicle_id) ? `${getVehicle(payOrder.vehicle_id)?.brand ?? ""} ${getVehicle(payOrder.vehicle_id)?.model ?? ""}`.trim() : "Vehículo"}</div>
+              <div className="flex items-start justify-between gap-4 bg-slate-900 text-white rounded-2xl p-4">
+                <div>
+                  <div className="text-xs opacity-60 uppercase tracking-wide font-semibold mb-0.5">Vehículo</div>
+                  <div className="font-bold text-sm">
+                    {getVehicle(payOrder.vehicle_id)
+                      ? `${getVehicle(payOrder.vehicle_id)?.brand ?? ""} ${getVehicle(payOrder.vehicle_id)?.model ?? ""}`.trim() || "Vehículo"
+                      : "Vehículo"}
+                  </div>
+                  <div className="text-xs opacity-50 mt-0.5">
+                    {folio(payOrder)} · {clientName(payOrder.client_id) || "Cliente general"}
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xs opacity-60 uppercase tracking-wide font-semibold mb-0.5">Total</div>
+                  <div className="font-black text-2xl leading-none">{fmt(payOrder.total)}</div>
+                </div>
+              </div>
             )}
+
+            {/* Payment method */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">Forma de pago</label>
-              <select className={inputCls} value={payMethod} onChange={e => { setPayMethod(e.target.value); setTendered(""); }}>
+              <select className={inp} value={payMethod} onChange={e => { setPayMethod(e.target.value); setTendered(""); }}>
                 {PAY_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>
 
-            {/* Cash change calculator */}
+            {/* Cash change helper */}
             {payMethod === "efectivo" && (
               <div className="rounded-xl bg-sky-50 border border-sky-200 p-4 space-y-3">
                 <div className="space-y-1">
                   <label className="text-sm font-medium text-slate-700">Efectivo recibido</label>
-                  <input type="number" min="0" step="0.01" className={inputCls} value={tendered}
-                    onChange={e => setTendered(e.target.value)} placeholder="Ej. 500" autoFocus />
+                  <input
+                    type="number" min="0" step="0.01" className={inp}
+                    value={tendered} onChange={e => setTendered(e.target.value)}
+                    placeholder="Ej. 500" autoFocus
+                  />
                 </div>
                 <div className="flex items-center justify-between bg-slate-900 text-white rounded-xl px-4 py-3">
                   <span className="text-xs font-semibold opacity-60 uppercase tracking-wide">Cambio a dar</span>
@@ -687,7 +874,6 @@ export default function Orders() {
               </div>
             )}
 
-            {/* Credit helper */}
             {payMethod === "credito" && (
               <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-sm">
                 <p className="font-bold text-amber-800">Se registrará como crédito.</p>
@@ -695,7 +881,6 @@ export default function Orders() {
               </div>
             )}
 
-            {/* Courtesy helper */}
             {payMethod === "cortesia" && (
               <div className="rounded-xl bg-sky-50 border border-sky-200 px-4 py-3 text-sm">
                 <p className="font-bold text-sky-800">Servicio cerrado como cortesía.</p>
@@ -712,59 +897,84 @@ export default function Orders() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Washer dialog ── */}
-      <Dialog open={washerDlg} onOpenChange={o => { if (!o) setWasherDlg(false); }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Asignar lavadores — Orden #{washerOrder?.id}</DialogTitle></DialogHeader>
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {washerRows.map((w, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                <div className="col-span-7 space-y-1">
-                  <label className="text-xs text-slate-500">Lavador</label>
-                  <select className={inputCls} value={w.user_id}
-                    onChange={e => setWasherRows(prev => prev.map((ws, i) => i === idx ? { ...ws, user_id: e.target.value } : ws))}>
-                    <option value="">Seleccionar…</option>
-                    {operators.map(op => <option key={op.id} value={op.id}>{op.name}</option>)}
-                  </select>
-                </div>
-                <div className="col-span-4 space-y-1">
-                  <label className="text-xs text-slate-500">% Comisión</label>
-                  <input type="number" min="0" max="100" className={inputCls} value={w.commission_percent}
-                    onChange={e => setWasherRows(prev => prev.map((ws, i) => i === idx ? { ...ws, commission_percent: e.target.value } : ws))} />
-                </div>
-                <button type="button" className="col-span-1 text-red-400 hover:text-red-600 pb-2 flex justify-center"
-                  onClick={() => setWasherRows(prev => prev.filter((_, i) => i !== idx))}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
+      {/* ── New order dialog ── */}
+      <Dialog open={newDlg} onOpenChange={o => { if (!o) setNewDlg(false); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Nueva orden de servicio</DialogTitle></DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+            {formError && (
+              <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{formError}</div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Cliente</label>
+                <select className={inp} value={newClientId} onChange={e => { setNewClientId(e.target.value); setNewVehicleId(""); }}>
+                  <option value="">Sin cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
-            ))}
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700">Vehículo</label>
+                <select className={inp} value={newVehicleId} onChange={e => setNewVehicleId(e.target.value)}>
+                  <option value="">Sin vehículo</option>
+                  {vehicles
+                    .filter(v => !newClientId || !v.client_id || v.client_id === parseInt(newClientId))
+                    .map(v => (
+                      <option key={v.id} value={v.id}>{[v.plate, v.brand, v.model].filter(Boolean).join(" ")}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Notas</label>
+              <input className={inp} value={newNotes} onChange={e => setNewNotes(e.target.value)} placeholder="Opcional" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-700">Servicios</label>
+                <Button size="sm" variant="outline" type="button"
+                  onClick={() => setNewItems(prev => [...prev, { catalog_id: null, custom_name: "", unit_price: "", quantity: 1 }])}>
+                  <Plus className="h-3 w-3 mr-1" /> Agregar
+                </Button>
+              </div>
+              {newItems.map((item, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                  <div className="col-span-5 space-y-1">
+                    <label className="text-xs text-slate-500">Catálogo</label>
+                    <select className={inp} value={item.catalog_id ?? ""} onChange={e => {
+                      const svc = services.find(s => s.id === parseInt(e.target.value));
+                      setNewItems(prev => prev.map((it, i) => i === idx
+                        ? { ...it, catalog_id: svc?.id ?? null, custom_name: "", unit_price: svc?.base_price ?? it.unit_price }
+                        : it));
+                    }}>
+                      <option value="">Personalizado</option>
+                      {services.map(s => <option key={s.id} value={s.id}>{s.name} — {fmt(s.base_price)}</option>)}
+                    </select>
+                  </div>
+                  {!item.catalog_id && (
+                    <div className="col-span-3 space-y-1">
+                      <label className="text-xs text-slate-500">Nombre</label>
+                      <input className={inp} value={item.custom_name} placeholder="Descripción"
+                        onChange={e => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, custom_name: e.target.value } : it))} />
+                    </div>
+                  )}
+                  <div className={`${item.catalog_id ? "col-span-6" : "col-span-3"} space-y-1`}>
+                    <label className="text-xs text-slate-500">Precio</label>
+                    <input type="number" min="0" step="0.01" className={inp} value={item.unit_price} placeholder="0.00"
+                      onChange={e => setNewItems(prev => prev.map((it, i) => i === idx ? { ...it, unit_price: e.target.value } : it))} />
+                  </div>
+                  <button type="button" className="col-span-1 text-red-400 hover:text-red-600 pb-2 flex justify-center"
+                    onClick={() => setNewItems(prev => prev.filter((_, i) => i !== idx))}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setWasherRows(prev => [...prev, { user_id: "", commission_percent: "0" }])}>
-            <Plus className="h-3 w-3 mr-1" /> Agregar lavador
-          </Button>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWasherDlg(false)} disabled={saving}>Cancelar</Button>
-            <Button onClick={handleAssignWashers} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Cancel dialog ── */}
-      <Dialog open={cancelDlg} onOpenChange={o => { if (!o) { setCancelDlg(false); setCancelOrder(null); } }}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Cancelar orden #{cancelOrder?.id}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-1">
-            <label className="text-sm font-medium text-slate-700">Motivo <span className="text-red-500">*</span></label>
-            <input className={inputCls} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Describe el motivo de la cancelación" />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => { setCancelDlg(false); setCancelOrder(null); }} disabled={saving}>Volver</Button>
-            <Button variant="destructive" onClick={handleCancel} disabled={saving || !cancelReason.trim()}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Cancelar orden
+            <Button variant="outline" onClick={() => setNewDlg(false)} disabled={saving}>Cancelar</Button>
+            <Button onClick={handleCreateOrder} disabled={saving}>
+              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crear orden
             </Button>
           </DialogFooter>
         </DialogContent>

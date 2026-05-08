@@ -230,6 +230,23 @@ def remove_item(
     return order
 
 
+def update_order_total(
+    session: Session,
+    order_id: int,
+    *,
+    total: Decimal,
+    actor: User,
+    company_id: int | None,
+) -> ServiceOrder:
+    order = get_order(session, order_id, company_id=company_id)
+    if order.status == OrderStatus.CANCELLED.value:
+        raise ValidationError("No se puede modificar una orden cancelada.")
+    order.total = total
+    session.commit()
+    session.refresh(order)
+    return order
+
+
 def _recalculate_order_total(order: ServiceOrder) -> None:
     subtotal = sum(
         (i.unit_price * i.quantity for i in order.items),

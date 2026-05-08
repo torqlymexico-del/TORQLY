@@ -14,7 +14,7 @@ from app.routes.api.common import raise_api_error
 from app.services.exceptions import ServiceError
 from app.services.orders import (
     add_item, assign_washers, create_order, get_order, list_orders,
-    remove_item, set_payment, update_order_status,
+    remove_item, set_payment, update_order_status, update_order_total,
 )
 
 
@@ -60,6 +60,11 @@ class SetPaymentIn(BaseModel):
 
 class AssignWashersIn(BaseModel):
     washers: list[WasherIn]
+
+
+class UpdateTotalIn(BaseModel):
+    total: Decimal
+    reason: str | None = None
 
 
 class WasherOut(BaseModel):
@@ -239,6 +244,25 @@ def add_order_item(
             custom_name=payload.custom_name,
             unit_price=payload.unit_price,
             quantity=payload.quantity,
+            actor=current_user,
+            company_id=current_company_id(current_user),
+        )
+        return OrderOut.model_validate(order)
+    except ServiceError as exc:
+        raise_api_error(exc)
+
+
+@router.patch("/{order_id}/total", response_model=OrderOut)
+def update_total(
+    order_id: int,
+    payload: UpdateTotalIn,
+    db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(require_roles(UserRole.ADMIN, UserRole.CASHIER, UserRole.SUPERVISOR))],
+):
+    try:
+        order = update_order_total(
+            db, order_id,
+            total=payload.total,
             actor=current_user,
             company_id=current_company_id(current_user),
         )
