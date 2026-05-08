@@ -68,12 +68,16 @@ export default function Dashboard() {
   const { user } = useAuth();
   const [data,    setData]    = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(false);
+  const [error,   setError]   = useState("");
 
   useEffect(() => {
     api.get<DashboardData>("/dashboard/summary")
       .then(r  => setData(r.data))
-      .catch(() => setError(true))
+      .catch((err) => {
+        const status = err?.response?.status;
+        const detail = err?.response?.data?.detail;
+        setError(detail ? `${status}: ${detail}` : (status ? `Error ${status}` : "Error de red"));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -102,7 +106,7 @@ export default function Dashboard() {
       {error && (
         <div className="flex items-center gap-3 bg-red-50 border border-red-100 text-red-700 rounded-xl px-4 py-3 text-sm">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          No se pudo cargar el dashboard. Recarga la página.
+          <span>No se pudo cargar el dashboard: <code className="font-mono">{error}</code></span>
         </div>
       )}
 
