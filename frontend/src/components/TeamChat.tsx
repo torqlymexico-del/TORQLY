@@ -113,6 +113,11 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
   const inputRef   = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Blur input when chat closes so iOS zooms back out
+  useEffect(() => {
+    if (!open) inputRef.current?.blur();
+  }, [open]);
+
   /* ── Initial load ── */
   const loadInitial = useCallback(async () => {
     try {
@@ -219,7 +224,7 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
       <div className="absolute inset-0 bg-black/20 pointer-events-auto" onClick={onClose} />
 
       {/* panel */}
-      <div className="relative pointer-events-auto flex flex-col w-80 md:w-96 h-full bg-white shadow-2xl border-l border-slate-200">
+      <div className="relative pointer-events-auto flex flex-col w-full md:w-96 h-full bg-white shadow-2xl border-l border-slate-200">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
@@ -350,7 +355,7 @@ export default function TeamChat({ open, onClose }: { open: boolean; onClose: ()
 
           <input
             ref={inputRef}
-            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-colors"
+            className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[16px] md:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition-colors"
             placeholder="Escribe un mensaje…"
             value={text}
             onChange={e => setText(e.target.value)}
