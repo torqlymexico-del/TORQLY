@@ -37,6 +37,7 @@ const NAV: Record<Branch, { to: string; icon: typeof LayoutDashboard; label: str
     { to: "/credits",       icon: BadgeDollarSign, label: "Créditos" },
     { to: "/payroll",       icon: DollarSign,      label: "Nómina" },
     { to: "/reports",       icon: BarChart2,       label: "Reportes" },
+    { to: "/bot",           icon: Bot,             label: "Bot" },
     { to: "/team",          icon: UserPlus,        label: "Equipo" },
     { to: "/notifications", icon: Bell,            label: "Notificaciones" },
     { to: "/integrations",  icon: Plug,            label: "Integraciones" },
