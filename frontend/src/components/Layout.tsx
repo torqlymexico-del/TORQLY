@@ -27,6 +27,7 @@ const BRANCHES: { key: Branch; label: string; icon: typeof Home; color: string; 
 const NAV: Record<Branch, { to: string; icon: typeof LayoutDashboard; label: string }[]> = {
   local: [
     { to: "/",              icon: LayoutDashboard, label: "Dashboard" },
+    { to: "/alta",          icon: Zap,             label: "Alta" },
     { to: "/orders",        icon: ShoppingBag,     label: "Órdenes" },
     { to: "/cash-sessions", icon: Wallet,          label: "Caja" },
     { to: "/clients",       icon: Users,           label: "Clientes" },
