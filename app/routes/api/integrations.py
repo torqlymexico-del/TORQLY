@@ -88,6 +88,12 @@ def create_account(
         return account_preview(account)
     except ValidationError as exc:
         raise _bad_request(exc)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar la integración: {exc}")
 
 
 @router.put("/accounts/{integration_id}")
@@ -106,6 +112,12 @@ def update_account(
         raise _not_found(exc)
     except ValidationError as exc:
         raise _bad_request(exc)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al actualizar la integración: {exc}")
 
 
 @router.post("/accounts/{integration_id}/test")
