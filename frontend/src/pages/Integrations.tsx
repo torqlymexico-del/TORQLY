@@ -99,7 +99,6 @@ const PROVIDERS: Record<Provider, ProviderMeta> = {
     ],
     configFields: [
       { key: "spreadsheet_id", label: "Spreadsheet ID", required: true, placeholder: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" },
-      { key: "calendar_id", label: "Calendar ID", placeholder: "primary" },
     ],
   },
   clickup: {
