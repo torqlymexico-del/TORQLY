@@ -23,6 +23,11 @@ class Vehicle(Base, TimestampMixin, SoftDeleteMixin, ActorAuditMixin):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    client = relationship("Client", back_populates="vehicles")
+    client = relationship(
+        "Client",
+        primaryjoin="Vehicle.client_id == Client.id",
+        foreign_keys="[Vehicle.client_id]",
+        back_populates="vehicles",
+    )
     appointments = relationship("Appointment", back_populates="vehicle")
 
