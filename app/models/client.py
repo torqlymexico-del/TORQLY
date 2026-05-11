@@ -19,8 +19,24 @@ class Client(Base, TimestampMixin, SoftDeleteMixin, ActorAuditMixin):
     default_vehicle_id: Mapped[int | None] = mapped_column(ForeignKey("vehicles.id"), nullable=True)
     default_service_id: Mapped[int | None] = mapped_column(ForeignKey("services_catalog.id"), nullable=True)
 
-    vehicles = relationship("Vehicle", back_populates="client", foreign_keys="Vehicle.client_id")
+    # All vehicles that belong to this client (via Vehicle.client_id)
+    vehicles = relationship(
+        "Vehicle",
+        primaryjoin="Vehicle.client_id == Client.id",
+        foreign_keys="[Vehicle.client_id]",
+        back_populates="client",
+    )
     appointments = relationship("Appointment", back_populates="client")
     whatsapp_conversations = relationship("WhatsAppConversation", back_populates="client")
-    default_vehicle = relationship("Vehicle", foreign_keys=[default_vehicle_id])
-    default_service = relationship("ServiceCatalog", foreign_keys=[default_service_id])
+
+    # The client's preferred vehicle for quick re-booking
+    default_vehicle = relationship(
+        "Vehicle",
+        primaryjoin="Client.default_vehicle_id == Vehicle.id",
+        foreign_keys="[Client.default_vehicle_id]",
+    )
+    default_service = relationship(
+        "ServiceCatalog",
+        primaryjoin="Client.default_service_id == ServiceCatalog.id",
+        foreign_keys="[Client.default_service_id]",
+    )
