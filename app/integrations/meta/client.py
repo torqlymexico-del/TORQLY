@@ -89,7 +89,8 @@ def get_leads(
             timeout=20,
         )
         if resp.status_code == 401:
-            handle_expired_credentials(session, runtime.get("integration_account"))
+            account = runtime.get("integration_account")
+            handle_expired_credentials(session, account.id if account else None)
         resp.raise_for_status()
         log_usage(session, runtime.get("integration_account"))
         raw_leads = resp.json().get("data", [])
