@@ -26,6 +26,7 @@ from app.services.integration_manager import (
     verify_whatsapp_signature,
     verify_whatsapp_token,
 )
+from app.integrations.meta import client as meta_client
 from app.integrations.whatsapp.webhook import parse_whatsapp_webhook_payload
 from app.services.whatsapp_conversations import process_whatsapp_webhook
 
@@ -260,3 +261,65 @@ async def clickup_webhook(
     )
     db.commit()
     return {"received": True, **result}
+
+
+# ── Meta Business Ads ─────────────────────────────────────────────────────────
+
+@router.get("/meta/leads")
+def meta_leads(
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(get_current_user),
+    form_id: str | None = None,
+    limit: int = 100,
+    integration_account_id: int | None = None,
+) -> list[dict]:
+    """Lista leads del Ad Account o de un formulario específico."""
+    company_id = current_company_id(current_user)
+    try:
+        return meta_client.get_leads(
+            db,
+            company_id=company_id,
+            integration_account_id=integration_account_id,
+            form_id=form_id,
+            limit=min(limit, 250),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Error al consultar leads de Meta: {exc}")
+
+
+@router.get("/meta/forms")
+def meta_lead_forms(
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(get_current_user),
+    integration_account_id: int | None = None,
+) -> list[dict]:
+    """Lista formularios de leads de la página de Facebook."""
+    company_id = current_company_id(current_user)
+    try:
+        return meta_client.get_lead_forms(
+            db,
+            company_id=company_id,
+            integration_account_id=integration_account_id,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Error al consultar formularios de Meta: {exc}")
+
+
+@router.get("/meta/campaigns")
+def meta_campaigns(
+    db: Annotated[Session, Depends(get_db)],
+    current_user=Depends(get_current_user),
+    date_preset: str = "last_30d",
+    integration_account_id: int | None = None,
+) -> list[dict]:
+    """Lista campañas del Ad Account con métricas de alcance y leads."""
+    company_id = current_company_id(current_user)
+    try:
+        return meta_client.get_campaigns(
+            db,
+            company_id=company_id,
+            integration_account_id=integration_account_id,
+            date_preset=date_preset,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Error al consultar campañas de Meta: {exc}")
