@@ -9,6 +9,7 @@ from app.services.automations import (
     run_low_stock_monitor,
     run_upcoming_appointment_automations,
 )
+from app.services.whatsapp_conversations import send_reengagement_messages
 from app.utils.dates import get_timezone
 from app.utils.logger import get_logger
 
@@ -77,6 +78,15 @@ def start_scheduler() -> dict:
         hour=hour,
         minute=minute,
         id="torqly_daily_close",
+        replace_existing=True,
+        max_instances=1,
+    )
+    scheduler.add_job(
+        lambda: _run_job("whatsapp_reengagement", send_reengagement_messages),
+        trigger="cron",
+        hour=10,
+        minute=0,
+        id="torqly_whatsapp_reengagement",
         replace_existing=True,
         max_instances=1,
     )

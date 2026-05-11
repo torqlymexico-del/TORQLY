@@ -29,8 +29,9 @@ from app.services.integration_manager import resolve_whatsapp_account_from_metad
 from app.utils.dates import combine_local_date_time, get_timezone, local_now
 
 
-AFFIRMATIVE_WORDS = {"si", "sí", "confirmo", "ok", "vale", "listo", "confirmar"}
+AFFIRMATIVE_WORDS = {"si", "sí", "confirmo", "ok", "vale", "listo", "confirmar", "yes"}
 NEGATIVE_WORDS = {"no", "cambiar", "cancela", "cancelar"}
+BRANCH_DOMICILIO = "domicilio"
 
 
 def _normalize_text(value: str | None) -> str:
@@ -143,6 +144,7 @@ def _match_service(session: Session, requested_text: str | None) -> ServiceCatal
             select(ServiceCatalog)
             .where(ServiceCatalog.deleted_at.is_(None))
             .where(ServiceCatalog.is_active.is_(True))
+            .where(ServiceCatalog.branch == BRANCH_DOMICILIO)
             .order_by(ServiceCatalog.name.asc())
         ).all()
     )
@@ -182,14 +184,33 @@ def _service_prompt(session: Session) -> str:
             select(ServiceCatalog.name)
             .where(ServiceCatalog.deleted_at.is_(None))
             .where(ServiceCatalog.is_active.is_(True))
+            .where(ServiceCatalog.branch == BRANCH_DOMICILIO)
             .order_by(ServiceCatalog.name.asc())
-            .limit(6)
+            .limit(8)
         ).all()
     )
     if not services:
-        return "Que servicio deseas?"
-    return "Que servicio deseas? Opciones: " + ", ".join(services)
+        return "Que servicio deseas agendar?"
+    bullet_list = "\n".join(f"• {s}" for s in services)
+    return f"Que servicio deseas? Nuestros servicios a domicilio:\n{bullet_list}"
 
+
+def _bot_summary(conversation: WhatsAppConversation) -> str:
+    payload = _payload_data(conversation)
+    location_line = ""
+    if payload.get("latitude") is not None:
+        address = payload.get("location_address") or f"{payload['latitude']}, {payload['longitude']}"
+        location_line = f"\nUbicacion: {address}"
+    return (
+        f"Nombre: {payload.get('customer_name') or '-'}\n"
+        f"Vehiculo: {payload.get('vehicle_text') or '-'}\n"
+        f"Servicio: {payload.get('service_text') or '-'}\n"
+        f"Fecha: {_format_schedule_for_humans(_payload_date(payload, 'requested_date'), _payload_time(payload, 'requested_time'))}"
+        f"{location_line}"
+    )
+
+
+# ── Conversation queries ───────────────────────────────────────────────────────
 
 def list_conversations(session: Session) -> list[WhatsAppConversation]:
     return list(
@@ -239,6 +260,8 @@ def _find_client_by_phone(session: Session, phone: str) -> Client | None:
     )
 
 
+# ── Conversation create/get ────────────────────────────────────────────────────
+
 def get_or_create_conversation(
     session: Session,
     *,
@@ -284,6 +307,8 @@ def get_or_create_conversation(
     session.flush()
     return conversation
 
+
+# ── Message store ─────────────────────────────────────────────────────────────
 
 def _create_message(
     session: Session,
@@ -357,6 +382,8 @@ def _store_outbound_message(
     )
 
 
+# ── Send helpers ──────────────────────────────────────────────────────────────
+
 def send_conversation_message(
     session: Session,
     conversation: WhatsAppConversation,
@@ -416,6 +443,8 @@ def send_automation_message(
     )
 
 
+# ── Delivery status ───────────────────────────────────────────────────────────
+
 def _update_delivery_status(session: Session, event: dict) -> None:
     external_message_id = event.get("external_message_id")
     if not external_message_id:
@@ -441,21 +470,20 @@ def _update_delivery_status(session: Session, event: dict) -> None:
     message.payload = payload
 
 
-def _bot_summary(conversation: WhatsAppConversation) -> str:
-    payload = _payload_data(conversation)
-    return (
-        f"Nombre: {payload.get('customer_name')}\n"
-        f"Vehiculo: {payload.get('vehicle_text')}\n"
-        f"Servicio: {payload.get('service_text')}\n"
-        f"Fecha: {_format_schedule_for_humans(_payload_date(payload, 'requested_date'), _payload_time(payload, 'requested_time'))}"
-    )
+# ── Bot state machine ─────────────────────────────────────────────────────────
 
-
-def _advance_bot(session: Session, conversation: WhatsAppConversation, incoming_text: str | None) -> str | None:
+def _advance_bot(
+    session: Session,
+    conversation: WhatsAppConversation,
+    incoming_text: str | None,
+    *,
+    location: dict | None = None,
+) -> str | None:
     text = (incoming_text or "").strip()
     normalized = _normalize_text(text)
     payload = _payload_data(conversation)
 
+    # Escape hatch: request a human agent at any point
     if normalized in {"humano", "asesor", "persona"}:
         payload["previous_bot_state"] = conversation.bot_state
         conversation.payload = payload
@@ -466,10 +494,55 @@ def _advance_bot(session: Session, conversation: WhatsAppConversation, incoming_
     if conversation.mode == WhatsAppConversationMode.HUMAN.value:
         return None
 
+    # ── NEW / session start ───────────────────────────────────────────────────
     if conversation.bot_state in {"", None, WhatsAppBotState.NEW.value}:
-        conversation.bot_state = WhatsAppBotState.WAITING_NAME.value
-        return "Hola, bienvenido a Torqly. Para agendar, comparteme tu nombre completo."
+        existing_client = _find_client_by_phone(session, conversation.phone)
+        if (
+            existing_client
+            and existing_client.default_vehicle_id
+            and existing_client.default_service_id
+            and existing_client.branch == BRANCH_DOMICILIO
+        ):
+            vehicle = session.get(Vehicle, existing_client.default_vehicle_id)
+            service = session.get(ServiceCatalog, existing_client.default_service_id)
+            conversation.client_id = existing_client.id
+            conversation.bot_state = WhatsAppBotState.RETURNING_CLIENT_CONFIRM.value
+            name = existing_client.name.split()[0] if existing_client.name else "cliente"
+            vehicle_label = f"{vehicle.brand} {vehicle.model}" if vehicle else "tu vehiculo"
+            service_name = service.name if service else "tu servicio"
+            return (
+                f"Hola {name}! Que gusto verte de nuevo 😊\n"
+                f"Te gustaria agendar tu *{vehicle_label}* para *{service_name}*?\n"
+                "Responde *SI* para continuar o dime que necesitas."
+            )
+        else:
+            conversation.bot_state = WhatsAppBotState.WAITING_NAME.value
+            return (
+                "Hola! Bienvenido a Torqly 🚗✨\n"
+                "Somos tu servicio de lavado y detallado a domicilio.\n"
+                "Para comenzar, compárteme tu nombre completo."
+            )
 
+    # ── RETURNING CLIENT ──────────────────────────────────────────────────────
+    if conversation.bot_state == WhatsAppBotState.RETURNING_CLIENT_CONFIRM.value:
+        if normalized in AFFIRMATIVE_WORDS:
+            client = session.get(Client, conversation.client_id)
+            if client and client.default_vehicle_id and client.default_service_id:
+                vehicle = session.get(Vehicle, client.default_vehicle_id)
+                service = session.get(ServiceCatalog, client.default_service_id)
+                payload["matched_service_id"] = client.default_service_id
+                payload["vehicle_id_saved"] = client.default_vehicle_id
+                payload["vehicle_text"] = f"{vehicle.brand} {vehicle.model}" if vehicle else ""
+                payload["service_text"] = service.name if service else ""
+                payload["customer_name"] = client.name
+                conversation.payload = payload
+                conversation.bot_state = WhatsAppBotState.WAITING_DATE.value
+                return "Perfecto! Que fecha prefieres? Usa formato DD/MM/AAAA o escribe *manana*."
+        # No or unexpected — start fresh vehicle selection
+        conversation.bot_state = WhatsAppBotState.WAITING_VEHICLE.value
+        return "Sin problema. Que vehiculo deseas agendar? Ejemplo: Honda Civic negro."
+
+    # ── WAITING NAME ──────────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.WAITING_NAME.value:
         if len(text) < 2:
             return "Necesito tu nombre para continuar. Como te llamas?"
@@ -477,8 +550,9 @@ def _advance_bot(session: Session, conversation: WhatsAppConversation, incoming_
         conversation.payload = payload
         conversation.display_name = text
         conversation.bot_state = WhatsAppBotState.WAITING_VEHICLE.value
-        return "Perfecto. Que vehiculo deseas agendar? Ejemplo: Honda Civic negro."
+        return f"Mucho gusto, {text.split()[0]}! 🙌\nQue vehiculo deseas agendar?\nEjemplo: *Honda Civic* o *Toyota Hilux roja*."
 
+    # ── WAITING VEHICLE ───────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.WAITING_VEHICLE.value:
         if len(text) < 2:
             return "Compárteme marca y modelo del vehiculo, por favor."
@@ -487,6 +561,7 @@ def _advance_bot(session: Session, conversation: WhatsAppConversation, incoming_
         conversation.bot_state = WhatsAppBotState.WAITING_SERVICE.value
         return _service_prompt(session)
 
+    # ── WAITING SERVICE ───────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.WAITING_SERVICE.value:
         matched_service = _match_service(session, text)
         if not matched_service:
@@ -495,52 +570,83 @@ def _advance_bot(session: Session, conversation: WhatsAppConversation, incoming_
         payload["matched_service_id"] = matched_service.id
         conversation.payload = payload
         conversation.bot_state = WhatsAppBotState.WAITING_DATE.value
-        return "Que fecha prefieres? Usa formato DD/MM/AAAA, YYYY-MM-DD o escribe manana."
+        return "Que fecha prefieres? Usa formato *DD/MM/AAAA* o escribe *manana*."
 
+    # ── WAITING DATE ──────────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.WAITING_DATE.value:
         parsed_date = _parse_date_from_text(text)
         if not parsed_date:
-            return "No pude leer la fecha. Intenta con DD/MM/AAAA o YYYY-MM-DD."
+            return "No pude leer la fecha. Intenta con *DD/MM/AAAA* o escribe *manana*."
         payload["requested_date"] = parsed_date.isoformat()
         conversation.payload = payload
         conversation.bot_state = WhatsAppBotState.WAITING_TIME.value
-        return "Que hora prefieres? Usa formato HH:MM en horario de 24 horas."
+        return "A que hora? Usa formato *HH:MM* (24 hrs). Ejemplo: *10:00* o *16:30*."
 
+    # ── WAITING TIME ──────────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.WAITING_TIME.value:
         parsed_time = _parse_time_from_text(text)
         if not parsed_time:
-            return "No pude leer la hora. Intenta con formato HH:MM, por ejemplo 16:30."
+            return "No pude leer la hora. Intenta con formato *HH:MM*, por ejemplo *10:00*."
         payload["requested_time"] = parsed_time.isoformat()
+        conversation.payload = payload
+        conversation.bot_state = WhatsAppBotState.WAITING_LOCATION.value
+        return (
+            "Casi listo! Necesito tu ubicacion para enviarte al lavador 📍\n"
+            "Por favor comparte tu ubicacion desde WhatsApp:\n"
+            "📎 *Clip* → *Ubicacion* → *Enviar ubicacion actual*"
+        )
+
+    # ── WAITING LOCATION ──────────────────────────────────────────────────────
+    if conversation.bot_state == WhatsAppBotState.WAITING_LOCATION.value:
+        if not location or location.get("latitude") is None:
+            return (
+                "Necesito tu ubicacion para continuar 📍\n"
+                "En WhatsApp: toca el 📎 clip → *Ubicacion* → *Enviar ubicacion actual*"
+            )
+        lat = float(location["latitude"])
+        lng = float(location["longitude"])
+        address_label = (
+            location.get("address")
+            or location.get("name")
+            or f"{lat:.6f}, {lng:.6f}"
+        )
+        payload["latitude"] = lat
+        payload["longitude"] = lng
+        payload["location_address"] = address_label
         conversation.payload = payload
         conversation.bot_state = WhatsAppBotState.CONFIRMING.value
         return (
-            "Confirma tu cita con este resumen:\n"
-            f"{_bot_summary(conversation)}\n"
-            "Responde SI para confirmar o NO para cambiar datos."
+            "Confirma tu cita:\n"
+            f"{_bot_summary(conversation)}\n\n"
+            "Responde *SI* para confirmar o *NO* para corregir."
         )
 
+    # ── CONFIRMING ────────────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.CONFIRMING.value:
         if normalized in NEGATIVE_WORDS:
             conversation.bot_state = WhatsAppBotState.WAITING_SERVICE.value
             return "De acuerdo. Indica de nuevo el servicio que deseas agendar."
         if normalized not in AFFIRMATIVE_WORDS:
-            return "Responde SI para confirmar o NO para corregir la cita."
+            return "Responde *SI* para confirmar o *NO* para corregir la cita."
         appointment = create_appointment_from_conversation(session, conversation.id)
         conversation = get_conversation(session, conversation.id)
         conversation.bot_state = WhatsAppBotState.COMPLETED.value
         _set_payload_value(conversation, last_appointment_id=appointment.id)
         return None
 
+    # ── COMPLETED ─────────────────────────────────────────────────────────────
     if conversation.bot_state == WhatsAppBotState.COMPLETED.value:
-        if normalized in {"nueva cita", "agendar", "otra cita"}:
+        if normalized in {"nueva cita", "agendar", "otra cita", "cita"}:
             conversation.bot_state = WhatsAppBotState.WAITING_VEHICLE.value
-            return "Claro. Que vehiculo deseas agendar ahora?"
-        return "Tu conversacion sigue abierta. Si deseas otra cita, escribe 'nueva cita'."
+            return "Claro! Que vehiculo deseas agendar ahora?"
+        return "Tu cita esta registrada. Si deseas otra, escribe *nueva cita*."
 
     return None
 
 
-def _ensure_client_for_conversation(session: Session, conversation: WhatsAppConversation):
+# ── Client / vehicle auto-create ──────────────────────────────────────────────
+
+def _ensure_client_for_conversation(session: Session, conversation: WhatsAppConversation) -> Client:
     if conversation.client_id:
         client = session.get(Client, conversation.client_id)
         if client and client.deleted_at is None:
@@ -557,7 +663,8 @@ def _ensure_client_for_conversation(session: Session, conversation: WhatsAppConv
         phone=conversation.phone,
         email=None,
         address=None,
-        notes="Creado automaticamente desde WhatsApp Cloud API.",
+        branch=BRANCH_DOMICILIO,
+        notes="Creado automaticamente desde WhatsApp.",
         is_active=True,
     )
     session.add(client)
@@ -569,13 +676,20 @@ def _ensure_client_for_conversation(session: Session, conversation: WhatsAppConv
         action="whatsapp.client.auto_create",
         entity_type="client",
         entity_id=client.id,
-        description="Cliente creado automaticamente desde conversacion WhatsApp.",
+        description="Cliente domicilio creado desde WhatsApp.",
     )
     return client
 
 
-def _ensure_vehicle_for_client(session: Session, client: Client, vehicle_text: str | None) -> Vehicle:
-    brand, model = _parse_vehicle_label(vehicle_text or "")
+def _ensure_vehicle_for_client(session: Session, client: Client, payload: dict) -> Vehicle:
+    saved_vehicle_id = payload.get("vehicle_id_saved")
+    if saved_vehicle_id:
+        vehicle = session.get(Vehicle, saved_vehicle_id)
+        if vehicle and vehicle.deleted_at is None:
+            return vehicle
+
+    vehicle_text = payload.get("vehicle_text") or ""
+    brand, model = _parse_vehicle_label(vehicle_text)
     vehicle = session.scalar(
         select(Vehicle)
         .where(Vehicle.client_id == client.id)
@@ -588,12 +702,13 @@ def _ensure_vehicle_for_client(session: Session, client: Client, vehicle_text: s
 
     vehicle = Vehicle(
         client_id=client.id,
+        branch=BRANCH_DOMICILIO,
         brand=brand,
         model=model,
         year=None,
         color=None,
         plates=None,
-        notes=f"Creado desde WhatsApp: {vehicle_text or ''}".strip(),
+        notes=f"Creado desde WhatsApp: {vehicle_text}".strip(),
         is_active=True,
     )
     session.add(vehicle)
@@ -604,10 +719,12 @@ def _ensure_vehicle_for_client(session: Session, client: Client, vehicle_text: s
         action="whatsapp.vehicle.auto_create",
         entity_type="vehicle",
         entity_id=vehicle.id,
-        description="Vehiculo creado automaticamente desde conversacion WhatsApp.",
+        description="Vehiculo domicilio creado desde WhatsApp.",
     )
     return vehicle
 
+
+# ── Appointment creation from conversation ────────────────────────────────────
 
 def create_appointment_from_conversation(
     session: Session,
@@ -634,7 +751,11 @@ def create_appointment_from_conversation(
         raise ValidationError("La conversacion todavia no tiene fecha y hora suficientes.")
 
     client = _ensure_client_for_conversation(session, conversation)
-    vehicle = _ensure_vehicle_for_client(session, client, payload.get("vehicle_text"))
+    vehicle = _ensure_vehicle_for_client(session, client, payload)
+
+    lat = payload.get("latitude")
+    lng = payload.get("longitude")
+    address = payload.get("location_address") or None
 
     from app.schemas.appointment import AppointmentCreate
     from app.services.appointments import create_appointment
@@ -648,14 +769,35 @@ def create_appointment_from_conversation(
             operator_id=operator_id,
             whatsapp_integration_id=conversation.integration_account_id,
             scheduled_start=combine_local_date_time(target_date, target_time),
-            address=None,
-            notes=f"Creada desde WhatsApp. Conversacion #{conversation.id}.",
+            address=address,
+            notes=f"Domicilio via WhatsApp. Conversacion #{conversation.id}.",
             status=AppointmentStatus.CONFIRMED,
             origin=AppointmentOrigin.WHATSAPP,
             estimated_price=service.base_price,
         ),
         actor=actor,
     )
+
+    # Store GPS coordinates on the appointment
+    if lat is not None and lng is not None:
+        appointment.latitude = float(lat)
+        appointment.longitude = float(lng)
+        session.flush()
+
+    # Save default vehicle and service on client for future re-booking
+    client.default_vehicle_id = vehicle.id
+    client.default_service_id = service.id
+    if client.branch != BRANCH_DOMICILIO:
+        client.branch = BRANCH_DOMICILIO
+    session.flush()
+
+    # Sync to Google Calendar (non-blocking)
+    try:
+        from app.integrations.google.calendar import create_calendar_event
+        create_calendar_event(session, appointment)
+    except Exception:
+        pass
+
     conversation.client_id = client.id
     conversation.summary = _bot_summary(conversation)
     conversation.bot_state = WhatsAppBotState.COMPLETED.value
@@ -664,6 +806,8 @@ def create_appointment_from_conversation(
     _set_payload_value(conversation, last_appointment_id=appointment.id, matched_service_id=service.id)
     return appointment
 
+
+# ── Human mode / admin tools ──────────────────────────────────────────────────
 
 def set_human_mode(session: Session, conversation_id: int, *, enabled: bool, actor) -> WhatsAppConversation:
     conversation = get_conversation(session, conversation_id)
@@ -717,6 +861,8 @@ def reply_manually(session: Session, conversation_id: int, *, body: str, actor) 
     session.commit()
     return delivery
 
+
+# ── Appointment notification messages ─────────────────────────────────────────
 
 def send_appointment_confirmation_message(session: Session, appointment) -> dict | None:
     if not appointment.client or not appointment.client.phone:
@@ -793,6 +939,107 @@ def send_service_completed_message(session: Session, appointment) -> dict | None
     return delivery
 
 
+# ── Re-engagement ─────────────────────────────────────────────────────────────
+
+def send_reengagement_messages(session: Session) -> dict:
+    """
+    Sends a re-engagement WhatsApp message to domicilio clients whose last
+    appointment was 8–30 days ago and haven't received one in the last 8 days.
+    """
+    from app.models.appointment import Appointment
+    from sqlalchemy import and_, or_
+
+    cutoff_min = local_now() - timedelta(days=30)
+    cutoff_max = local_now() - timedelta(days=8)
+
+    # Clients with last appointment in the 8-30 day window
+    subq = (
+        select(Appointment.client_id, func.max(Appointment.scheduled_start).label("last_appt"))
+        .where(Appointment.deleted_at.is_(None))
+        .where(Appointment.origin == AppointmentOrigin.WHATSAPP.value)
+        .group_by(Appointment.client_id)
+        .subquery()
+    )
+
+    clients = list(
+        session.scalars(
+            select(Client)
+            .join(subq, Client.id == subq.c.client_id)
+            .where(Client.deleted_at.is_(None))
+            .where(Client.is_active.is_(True))
+            .where(Client.branch == BRANCH_DOMICILIO)
+            .where(Client.phone != "")
+            .where(subq.c.last_appt >= cutoff_min)
+            .where(subq.c.last_appt <= cutoff_max)
+        ).all()
+    )
+
+    sent = 0
+    skipped = 0
+    for client in clients:
+        # Check conversation payload to avoid spamming
+        conversation = session.scalar(
+            select(WhatsAppConversation)
+            .where(WhatsAppConversation.client_id == client.id)
+            .where(WhatsAppConversation.status != WhatsAppConversationStatus.ARCHIVED.value)
+            .order_by(WhatsAppConversation.last_message_at.desc().nullslast())
+        )
+        if conversation:
+            conv_payload = _payload_data(conversation)
+            last_reeng = conv_payload.get("last_reengagement_at")
+            if last_reeng:
+                try:
+                    last_dt = datetime.fromisoformat(last_reeng)
+                    if (local_now() - last_dt) < timedelta(days=8):
+                        skipped += 1
+                        continue
+                except (ValueError, TypeError):
+                    pass
+
+        # Compose re-engagement message
+        service_name = ""
+        if client.default_service_id:
+            svc = session.get(ServiceCatalog, client.default_service_id)
+            service_name = svc.name if svc else ""
+
+        first_name = client.name.split()[0] if client.name else "cliente"
+        now_hour = local_now().hour
+        greeting = "Buenos dias" if now_hour < 13 else ("Buenas tardes" if now_hour < 20 else "Buenas noches")
+
+        if service_name:
+            body = (
+                f"{greeting} {first_name}! 🚗✨\n"
+                f"Lo estabamos esperando desde su ultimo servicio de *{service_name}*.\n"
+                "Nos preguntabamos cuando volveria a agendar 😊\n"
+                "Escribe *agendar* para reservar su cita o *humano* para hablar con nosotros."
+            )
+        else:
+            body = (
+                f"{greeting} {first_name}! 🚗✨\n"
+                "Lo estabamos esperando desde su ultimo servicio.\n"
+                "Escribe *agendar* para reservar su proxima cita 😊"
+            )
+
+        try:
+            send_automation_message(
+                session,
+                phone=client.phone,
+                body=body,
+                display_name=client.name,
+            )
+            # Mark re-engagement sent in conversation payload
+            conv = get_or_create_conversation(session, phone=client.phone, display_name=client.name)
+            _set_payload_value(conv, last_reengagement_at=local_now().isoformat())
+            sent += 1
+        except Exception:
+            skipped += 1
+
+    session.commit()
+    return {"reengagement_sent": sent, "skipped": skipped}
+
+
+# ── Webhook processor ─────────────────────────────────────────────────────────
+
 def process_whatsapp_webhook(session: Session, payload: dict) -> dict:
     inbound_messages, status_updates = parse_whatsapp_webhook_payload(payload)
     processed_replies = 0
@@ -810,7 +1057,12 @@ def process_whatsapp_webhook(session: Session, payload: dict) -> dict:
         _store_inbound_message(session, conversation=conversation, event=event)
         processed_inbound += 1
 
-        reply = _advance_bot(session, conversation, event.get("content"))
+        reply = _advance_bot(
+            session,
+            conversation,
+            event.get("content"),
+            location=event.get("location"),
+        )
         if reply:
             send_conversation_message(
                 session,

@@ -86,9 +86,11 @@ class WhatsAppBotState(str, Enum):
     WAITING_SERVICE = "waiting_service"
     WAITING_DATE = "waiting_date"
     WAITING_TIME = "waiting_time"
+    WAITING_LOCATION = "waiting_location"
     CONFIRMING = "confirming"
     COMPLETED = "completed"
     HUMAN_MODE = "human_mode"
+    RETURNING_CLIENT_CONFIRM = "returning_client_confirm"
 
 
 class WhatsAppConversationStatus(str, Enum):

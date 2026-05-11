@@ -40,6 +40,7 @@ def parse_whatsapp_webhook_payload(payload: dict) -> tuple[list[dict], list[dict
                     continue
                 message_type = item.get("type", "text")
                 text_body = None
+                location_data = None
                 if message_type == "text":
                     text_body = item.get("text", {}).get("body")
                 elif message_type == "button":
@@ -50,6 +51,14 @@ def parse_whatsapp_webhook_payload(payload: dict) -> tuple[list[dict], list[dict
                         interactive.get("button_reply", {}).get("title")
                         or interactive.get("list_reply", {}).get("title")
                     )
+                elif message_type == "location":
+                    raw_loc = item.get("location", {})
+                    location_data = {
+                        "latitude": raw_loc.get("latitude"),
+                        "longitude": raw_loc.get("longitude"),
+                        "name": raw_loc.get("name"),
+                        "address": raw_loc.get("address"),
+                    }
                 inbound_messages.append(
                     {
                         "phone": sender_phone,
@@ -57,6 +66,7 @@ def parse_whatsapp_webhook_payload(payload: dict) -> tuple[list[dict], list[dict
                         "external_message_id": item.get("id"),
                         "message_type": message_type,
                         "content": text_body,
+                        "location": location_data,
                         "timestamp": item.get("timestamp"),
                         "payload": item,
                         "metadata": metadata,
