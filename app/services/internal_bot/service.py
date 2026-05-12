@@ -432,7 +432,83 @@ def _handle_create_appointment(
     )
 
 
+def _build_analytics_snapshot(session: Session, *, company_id: int | None) -> str:
+    """Build a 30-day analytics summary for historical questions."""
+    lines = []
+    today = local_now().date()
+    date_30d_ago = today - timedelta(days=30)
+    date_7d_ago = today - timedelta(days=7)
+
+    try:
+        # Appointments per weekday (last 30 days)
+        appointments = list(
+            session.scalars(
+                select(Appointment)
+                .where(Appointment.deleted_at.is_(None))
+                .where(appointment_company_clause(company_id))
+                .where(Appointment.status != AppointmentStatus.CANCELLED.value)
+                .where(func.date(Appointment.scheduled_start) >= date_30d_ago)
+                .where(func.date(Appointment.scheduled_start) <= today)
+            ).all()
+        )
+        if appointments:
+            from collections import Counter
+            weekday_names = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+            by_weekday: Counter = Counter()
+            by_date: Counter = Counter()
+            for appt in appointments:
+                d = appt.scheduled_start.date() if appt.scheduled_start else None
+                if d:
+                    by_weekday[d.weekday()] += 1
+                    by_date[d.isoformat()] += 1
+            busiest_weekday = by_weekday.most_common(1)
+            busiest_date = by_date.most_common(1)
+            lines.append(f"Últimos 30 días — total citas: {len(appointments)}")
+            if busiest_weekday:
+                wd, count = busiest_weekday[0]
+                lines.append(f"Día de la semana más concurrido: {weekday_names[wd]} ({count} citas)")
+            if busiest_date:
+                d, count = busiest_date[0]
+                lines.append(f"Fecha con más citas: {d} ({count} citas)")
+    except Exception:
+        pass
+
+    try:
+        # Top services (last 30 days)
+        service_counts: dict[str, int] = {}
+        appointments_with_service = list(
+            session.scalars(
+                select(Appointment)
+                .options(joinedload(Appointment.service))
+                .where(Appointment.deleted_at.is_(None))
+                .where(appointment_company_clause(company_id))
+                .where(Appointment.status != AppointmentStatus.CANCELLED.value)
+                .where(func.date(Appointment.scheduled_start) >= date_30d_ago)
+            ).unique().all()
+        )
+        for appt in appointments_with_service:
+            name = appt.service.name if appt.service else "Sin servicio"
+            service_counts[name] = service_counts.get(name, 0) + 1
+        if service_counts:
+            top = sorted(service_counts.items(), key=lambda x: x[1], reverse=True)[:5]
+            lines.append("Servicios más vendidos (últimos 30 días):")
+            for i, (name, count) in enumerate(top, 1):
+                lines.append(f"  {i}. {name}: {count} veces")
+    except Exception:
+        pass
+
+    try:
+        # Weekly vs last week comparison
+        week_report = daily_report(session, target_date=today, company_id=company_id)
+        lines.append(f"Ventas de hoy: ${week_report.get('summary', {}).get('total_sales', 0):.2f}")
+    except Exception:
+        pass
+
+    return "\n".join(lines) if lines else "Sin datos históricos disponibles."
+
+
 def _build_context_snapshot(session: Session, *, company_id: int | None) -> str:
+    """Gather a brief operational summary to give Claude context for free-form answers."""
     """Gather a brief operational summary to give Claude context for free-form answers."""
     lines = []
     try:
@@ -523,6 +599,23 @@ def execute_command(session: Session, *, command: str, actor: User) -> dict:
             status = InternalBotStatus.SUCCESS.value
         elif intent == InternalBotIntent.CREATE_APPOINTMENT.value:
             response = _handle_create_appointment(session, actor=actor, company_id=company_id, **params)
+            status = InternalBotStatus.SUCCESS.value
+        elif intent == InternalBotIntent.GET_ANALYTICS.value:
+            question = params.get("question", command)
+            if ai_parser.is_available():
+                analytics_data = _build_analytics_snapshot(session, company_id=company_id)
+                ai_answer = ai_parser.answer_analytics(question, analytics_data)
+                response = ai_answer or "No pude analizar los datos en este momento."
+            else:
+                response = "El análisis histórico requiere IA configurada (GROQ_API_KEY)."
+            status = InternalBotStatus.SUCCESS.value
+        elif intent == InternalBotIntent.GET_NAVIGATION_HELP.value:
+            question = params.get("question", command)
+            if ai_parser.is_available():
+                ai_answer = ai_parser.answer_navigation(question)
+                response = ai_answer or "No encontré esa función en el panel."
+            else:
+                response = "La ayuda de navegación requiere IA configurada (GROQ_API_KEY)."
             status = InternalBotStatus.SUCCESS.value
         else:
             # Try free-form AI answer before giving up

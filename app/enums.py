@@ -151,6 +151,8 @@ class InternalBotIntent(str, Enum):
     REASSIGN_OPERATOR = "reassign_operator"
     FINISH_SERVICE = "finish_service"
     CREATE_APPOINTMENT = "create_appointment"
+    GET_ANALYTICS = "get_analytics"
+    GET_NAVIGATION_HELP = "get_navigation_help"
     UNKNOWN = "unknown"
 
 
