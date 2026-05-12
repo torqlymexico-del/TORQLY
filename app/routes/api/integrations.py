@@ -216,8 +216,17 @@ def whatsapp_verify(
     token = hub_verify_token or request.query_params.get("hub.verify_token")
     challenge = hub_challenge or request.query_params.get("hub.challenge")
     mode = hub_mode or request.query_params.get("hub.mode")
-    if mode == "subscribe" and token and verify_whatsapp_token(db, token):
+    if mode != "subscribe" or not token:
+        raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
+    # Check env var first (no DB needed)
+    if settings.meta_whatsapp_verify_token and token == settings.meta_whatsapp_verify_token:
         return PlainTextResponse(challenge or "ok")
+    # Fallback: check stored integration account verify_token
+    try:
+        if verify_whatsapp_token(db, token):
+            return PlainTextResponse(challenge or "ok")
+    except Exception:
+        pass
     raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
 
 
