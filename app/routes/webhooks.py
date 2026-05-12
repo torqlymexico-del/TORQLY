@@ -32,18 +32,17 @@ def _decode_json_body(body: bytes) -> dict:
 
 
 @router.get("/whatsapp")
-def whatsapp_verify(
-    request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    hub_mode: str | None = None,
-    hub_challenge: str | None = None,
-    hub_verify_token: str | None = None,
-):
-    token = hub_verify_token or request.query_params.get("hub.verify_token")
-    challenge = hub_challenge or request.query_params.get("hub.challenge")
-    mode = hub_mode or request.query_params.get("hub.mode")
-    if mode == "subscribe" and token and verify_whatsapp_token(db, token):
-        return PlainTextResponse(challenge or "ok")
+def whatsapp_verify(request: Request):
+    import os as _os
+    mode = request.query_params.get("hub.mode", "")
+    token = request.query_params.get("hub.verify_token", "").strip().strip('"').strip("'")
+    challenge = request.query_params.get("hub.challenge", "")
+    if mode != "subscribe" or not token:
+        raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
+    for env_key in ("META_WHATSAPP_VERIFY_TOKEN", "WHATSAPP_VERIFY_TOKEN"):
+        stored = _os.environ.get(env_key, "").strip().strip('"').strip("'")
+        if stored and token == stored:
+            return PlainTextResponse(challenge or "ok")
     raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
 
 
