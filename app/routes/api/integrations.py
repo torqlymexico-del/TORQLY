@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -218,8 +219,14 @@ def whatsapp_verify(
     mode = hub_mode or request.query_params.get("hub.mode")
     if mode != "subscribe" or not token:
         raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
-    # Check env var first (no DB needed)
-    if settings.meta_whatsapp_verify_token and token == settings.meta_whatsapp_verify_token:
+    # Read directly from env to bypass any settings/cache layer
+    env_token = (
+        os.environ.get("META_WHATSAPP_VERIFY_TOKEN")
+        or os.environ.get("WHATSAPP_VERIFY_TOKEN")
+        or settings.meta_whatsapp_verify_token
+        or ""
+    )
+    if env_token and token == env_token:
         return PlainTextResponse(challenge or "ok")
     # Fallback: check stored integration account verify_token
     try:
