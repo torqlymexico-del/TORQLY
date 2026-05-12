@@ -207,30 +207,20 @@ def google_callback_placeholder(current_user=Depends(get_current_user)) -> dict:
 
 
 @router.get("/whatsapp/webhook")
-def whatsapp_verify(
-    request: Request,
-    db: Annotated[Session, Depends(get_db)],
-    hub_mode: str | None = None,
-    hub_challenge: str | None = None,
-    hub_verify_token: str | None = None,
-):
-    token = hub_verify_token or request.query_params.get("hub.verify_token")
-    challenge = hub_challenge or request.query_params.get("hub.challenge")
-    mode = hub_mode or request.query_params.get("hub.mode")
+def whatsapp_verify(request: Request):
+    # Meta sends hub.mode, hub.challenge, hub.verify_token (dots — not valid FastAPI param names)
+    mode = request.query_params.get("hub.mode", "")
+    token = request.query_params.get("hub.verify_token", "").strip().strip('"').strip("'")
+    challenge = request.query_params.get("hub.challenge", "")
+
     if mode != "subscribe" or not token:
         raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
-    token = token.strip()
-    # Read directly from env to bypass any settings/cache layer
+
     for env_key in ("META_WHATSAPP_VERIFY_TOKEN", "WHATSAPP_VERIFY_TOKEN"):
-        env_val = (os.environ.get(env_key) or "").strip()
-        if env_val and token == env_val:
+        stored = os.environ.get(env_key, "").strip().strip('"').strip("'")
+        if stored and token == stored:
             return PlainTextResponse(challenge or "ok")
-    # Fallback: check stored integration account verify_token
-    try:
-        if verify_whatsapp_token(db, token):
-            return PlainTextResponse(challenge or "ok")
-    except Exception:
-        pass
+
     raise HTTPException(status_code=403, detail="Token de verificacion invalido.")
 
 

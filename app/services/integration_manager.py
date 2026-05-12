@@ -647,14 +647,16 @@ def account_last_error(account: IntegrationAccount) -> IntegrationLog | None:
 
 
 def verify_whatsapp_token(session: Session, token: str) -> bool:
-    if settings.meta_whatsapp_verify_token and token == settings.meta_whatsapp_verify_token:
+    token = token.strip()
+    stored = (settings.meta_whatsapp_verify_token or "").strip().strip('"').strip("'")
+    if stored and token == stored:
         return True
     accounts = session.scalars(
         select(IntegrationAccount).where(
             IntegrationAccount.provider == IntegrationAccountProvider.WHATSAPP_META.value
         )
     ).all()
-    return any(get_credentials(account).get("verify_token") == token for account in accounts)
+    return any((get_credentials(account).get("verify_token") or "").strip() == token for account in accounts)
 
 
 def resolve_whatsapp_account_from_metadata(session: Session, metadata: dict | None) -> IntegrationAccount | None:
