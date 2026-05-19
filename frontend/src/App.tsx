@@ -17,6 +17,7 @@ import Integrations from "@/pages/Integrations";
 import Orders from "@/pages/Orders";
 import CashSessions from "@/pages/CashSessions";
 import Credits from "@/pages/Credits";
+import Accounting from "@/pages/Accounting";
 import Payroll from "@/pages/Payroll";
 import ServiceEntry from "@/pages/ServiceEntry";
 import Team from "@/pages/Team";
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/orders"        element={<Protected><Orders branch="local" /></Protected>} />
           <Route path="/cash-sessions" element={<Protected><CashSessions branch="local" /></Protected>} />
           <Route path="/credits"       element={<Protected><Credits /></Protected>} />
+          <Route path="/accounting"     element={<Protected><Accounting /></Protected>} />
           <Route path="/payroll"       element={<Protected><Payroll /></Protected>} />
           <Route path="/alta"          element={<Protected><ServiceEntry branch="local" /></Protected>} />
           <Route path="/team"          element={<Protected><Team /></Protected>} />
