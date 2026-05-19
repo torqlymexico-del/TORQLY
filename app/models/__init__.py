@@ -1,3 +1,11 @@
+from app.models.accounting import (
+    AccountingEquityMovement,
+    AccountingFixedAsset,
+    AccountingFixedCost,
+    AccountingMovementCategory,
+    AccountingPayable,
+    AccountingSettings,
+)
 from app.models.appointment import Appointment, ServiceJob
 from app.models.audit import AuditLog, IntegrationLog
 from app.models.base import Base
@@ -25,6 +33,12 @@ from app.models.vehicle import Vehicle
 from app.models.whatsapp import WhatsAppConversation, WhatsAppMessage
 
 __all__ = [
+    "AccountingEquityMovement",
+    "AccountingFixedAsset",
+    "AccountingFixedCost",
+    "AccountingMovementCategory",
+    "AccountingPayable",
+    "AccountingSettings",
     "Appointment",
     "AuditLog",
     "Base",

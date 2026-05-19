@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.routes.api import (
+    accounting,
     appointments,
     auth,
     bot,
@@ -28,6 +29,7 @@ from app.routes.api import (
 
 
 api_router = APIRouter(prefix="/api/v1")
+api_router.include_router(accounting.router)
 api_router.include_router(auth.router)
 api_router.include_router(bot.router)
 api_router.include_router(users.router)
