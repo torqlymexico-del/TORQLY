@@ -165,6 +165,7 @@ class InternalBotStatus(str, Enum):
 class OrderStatus(str, Enum):
     QUEUED = "en_cola"
     IN_PROGRESS = "en_proceso"
+    QUALITY_CHECK = "en_revision"
     READY = "listo"
     DELIVERED = "entregado"
     CANCELLED = "cancelado"

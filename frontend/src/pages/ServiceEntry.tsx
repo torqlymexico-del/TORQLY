@@ -244,9 +244,25 @@ export default function ServiceEntry({ branch = "local" }: { branch?: string }) 
   function toggleWasher(op: Operator) {
     const id = op.id;
     if (washers.find(w => w.user_id === id)) {
-      setWashers(prev => prev.filter(w => w.user_id !== id));
+      // Remove and restore full commission to remaining washer
+      setWashers(prev => {
+        const next = prev.filter(w => w.user_id !== id);
+        if (next.length === 1) {
+          const remaining = operators.find(o => o.id === next[0].user_id);
+          return [{ ...next[0], commission_percent: Number(remaining?.commission_percentage ?? next[0].commission_percent) }];
+        }
+        return next;
+      });
     } else if (washers.length < 2) {
-      setWashers(prev => [...prev, { user_id: id, name: op.name, commission_percent: Number(op.commission_percentage) }]);
+      setWashers(prev => {
+        const newWasher = { user_id: id, name: op.name, commission_percent: Number(op.commission_percentage) };
+        const next = [...prev, newWasher];
+        // Auto-split: divide each washer's commission in half when 2 are assigned
+        if (next.length === 2) {
+          return next.map(w => ({ ...w, commission_percent: Math.round(w.commission_percent / 2 * 10) / 10 }));
+        }
+        return next;
+      });
     }
   }
 
@@ -1005,7 +1021,8 @@ export default function ServiceEntry({ branch = "local" }: { branch?: string }) 
                       {op.name}
                     </p>
                     <p className="text-sm mt-0.5" style={{ color: selected && accentColor ? accentColor : "#94a3b8" }}>
-                      Comisión: <strong>{Number(op.commission_percentage)}%</strong>
+                      Comisión: <strong>{selected ? washers.find(w => w.user_id === op.id)?.commission_percent : Number(op.commission_percentage)}%</strong>
+                      {selected && washers.length === 2 && <span className="ml-1 text-xs opacity-75">(dividida)</span>}
                     </p>
                   </div>
 

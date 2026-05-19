@@ -26,14 +26,16 @@ interface Order {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const S: Record<string, { label: string; pill: string; dot: string; advance?: { label: string; value: string } }> = {
-  en_cola:    { label: "En cola",   pill: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",      dot: "bg-amber-400",
-                advance: { label: "Iniciar lavado", value: "en_proceso" } },
-  en_proceso: { label: "Lavando",   pill: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",         dot: "bg-blue-500",
-                advance: { label: "Marcar listo",   value: "listo" } },
-  listo:      { label: "Listo",     pill: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", dot: "bg-emerald-500",
-                advance: { label: "Entregar",        value: "entregado" } },
-  entregado:  { label: "Entregado", pill: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",     dot: "bg-slate-400" },
-  cancelado:  { label: "Cancelado", pill: "bg-red-50 text-red-600 ring-1 ring-red-200",            dot: "bg-red-400" },
+  en_cola:     { label: "En cola",     pill: "bg-amber-50 text-amber-700 ring-1 ring-amber-200",       dot: "bg-amber-400",
+                 advance: { label: "Iniciar lavado",   value: "en_proceso" } },
+  en_proceso:  { label: "Lavando",     pill: "bg-blue-50 text-blue-700 ring-1 ring-blue-200",          dot: "bg-blue-500",
+                 advance: { label: "Enviar a revisión", value: "en_revision" } },
+  en_revision: { label: "En revisión", pill: "bg-violet-50 text-violet-700 ring-1 ring-violet-200",    dot: "bg-violet-500",
+                 advance: { label: "Marcar listo",      value: "listo" } },
+  listo:       { label: "Listo",       pill: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200", dot: "bg-emerald-500",
+                 advance: { label: "Entregar",           value: "entregado" } },
+  entregado:   { label: "Entregado",   pill: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",      dot: "bg-slate-400" },
+  cancelado:   { label: "Cancelado",   pill: "bg-red-50 text-red-600 ring-1 ring-red-200",             dot: "bg-red-400" },
 };
 
 const P: Record<string, { label: string; color: string }> = {
@@ -55,10 +57,11 @@ const PAY_METHODS = [
 const PAY_LABELS: Record<string, string> = Object.fromEntries(PAY_METHODS.map(m => [m.value, m.label]));
 
 const STATUSES = [
-  { value: "en_cola",    label: "En cola" },
-  { value: "en_proceso", label: "En proceso" },
-  { value: "listo",      label: "Listo" },
-  { value: "entregado",  label: "Entregado" },
+  { value: "en_cola",     label: "En cola" },
+  { value: "en_proceso",  label: "Lavando" },
+  { value: "en_revision", label: "En revisión" },
+  { value: "listo",       label: "Listo" },
+  { value: "entregado",   label: "Entregado" },
 ];
 
 type Scope        = "today" | "date" | "history";

@@ -118,8 +118,10 @@ def update_order_status(
     order.status = status
     if status == OrderStatus.IN_PROGRESS.value and not order.started_at:
         order.started_at = now
-    elif status == OrderStatus.READY.value and not order.completed_at:
+    elif status == OrderStatus.QUALITY_CHECK.value and not order.completed_at:
         order.completed_at = now
+    elif status == OrderStatus.READY.value:
+        pass
     elif status == OrderStatus.DELIVERED.value:
         order.delivered_at = now
     elif status == OrderStatus.CANCELLED.value:
