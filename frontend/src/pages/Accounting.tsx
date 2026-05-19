@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Loader2, Plus, Trash2, Pencil, Check, X, TrendingUp, TrendingDown,
+  Loader2, Plus, Trash2, Pencil, Check, TrendingUp, TrendingDown,
   Settings2, Wrench, Building2, CreditCard, BarChart2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,7 +32,7 @@ interface Settings {
   monthly_depreciation: string;
   monthly_external_fees: string;
   target_net_margin: string;
-  closing_day: number;
+  closing_day: number | string;
   opening_retained_earnings: string;
   opening_retained_earnings_notes: string | null;
   opening_cash_balance: string;
