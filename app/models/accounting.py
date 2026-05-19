@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -89,7 +89,7 @@ class AccountingPayable(Base, TimestampMixin):
     created_by = relationship("User", foreign_keys=[created_by_id])
 
 
-class AccountingEquityMovement(Base, TimestampMixin):
+class AccountingEquityMovement(Base):
     __tablename__ = "accounting_equity_movements"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -100,6 +100,7 @@ class AccountingEquityMovement(Base, TimestampMixin):
     movement_date: Mapped[date] = mapped_column(Date, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     company = relationship("Company")
     created_by = relationship("User", foreign_keys=[created_by_id])
