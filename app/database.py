@@ -12,6 +12,9 @@ engine = create_engine(
     echo=settings.debug,
     future=True,
     pool_pre_ping=True,
+    pool_recycle=1800,   # recycle connections every 30 min
+    pool_size=5,
+    max_overflow=10,
 )
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, class_=Session)
