@@ -9,7 +9,7 @@ from app.schemas.user import UserCreate, UserUpdate
 from app.security import get_password_hash, verify_password
 from app.services.audit import log_action
 from app.services.companies import ensure_default_company
-from app.services.exceptions import ConflictError, NotFoundError
+from app.services.exceptions import ConflictError, NotFoundError, ValidationError
 
 
 def list_users(session: Session, *, company_id: int | None = None, branch: str | None = None) -> list[User]:
@@ -49,6 +49,74 @@ def authenticate_user(session: Session, *, phone: str, password: str) -> User | 
         return None
     if not user.is_active:
         return None
+    _post_login(session, user)
+    return user
+
+
+def find_google_user(
+    session: Session,
+    *,
+    google_sub: str,
+    email: str | None,
+) -> "User | None":
+    user = session.scalar(select(User).where(User.google_sub == google_sub))
+    if user:
+        return user
+    if email:
+        user = session.scalar(select(User).where(User.email == email))
+        if user:
+            user.google_sub = google_sub
+            session.commit()
+            session.refresh(user)
+            return user
+    return None
+
+
+def create_google_user_from_invite(
+    session: Session,
+    *,
+    google_sub: str,
+    email: str | None,
+    name: str,
+    invite_code: str,
+) -> User:
+    from app.models import InviteCode
+
+    invite = session.scalar(
+        select(InviteCode).where(InviteCode.code == invite_code.upper().strip())
+    )
+    if not invite:
+        raise ValidationError("Código de acceso inválido.")
+    if not invite.is_active or invite.used_at is not None:
+        raise ValidationError("Este código ya fue utilizado o fue revocado.")
+
+    user = User(
+        company_id=invite.company_id,
+        active_company_id=invite.company_id,
+        name=name or "Usuario Google",
+        phone=None,
+        email=email,
+        password_hash=None,
+        google_sub=google_sub,
+        role=invite.role,
+        branch=invite.branch,
+        is_active=True,
+    )
+    session.add(user)
+    session.flush()
+
+    invite.used_by_id = user.id
+    invite.used_at = datetime.now(timezone.utc)
+    invite.is_active = False
+
+    log_action(
+        session,
+        actor=user,
+        action="users.google_register",
+        entity_type="user",
+        entity_id=user.id,
+        description=f"Registro vía Google con código de acceso: {email or google_sub}.",
+    )
     _post_login(session, user)
     return user
 

@@ -87,25 +87,54 @@ def google_callback(
     except Exception as exc:
         return RedirectResponse(f"/login?error=Error+Google%3A+{str(exc)[:80]}", status_code=302)
 
+    google_sub = google_info["sub"]
+    email = google_info.get("email") or ""
+    name = google_info.get("name") or ""
+
     db_gen = get_db()
     db: Session = next(db_gen)
     try:
-        user = get_or_create_google_user(
-            db,
-            google_sub=google_info["sub"],
-            email=google_info.get("email"),
-            name=google_info.get("name", ""),
-        )
+        from app.services.users import find_google_user
+        user = find_google_user(db, google_sub=google_sub, email=email or None)
     except Exception as exc:
-        return RedirectResponse(f"/login?error=Error+al+crear+usuario%3A+{str(exc)[:80]}", status_code=302)
+        return RedirectResponse(f"/login?error=Error+de+base+de+datos%3A+{str(exc)[:80]}", status_code=302)
     finally:
         try:
             next(db_gen)
         except StopIteration:
             pass
 
-    response = RedirectResponse("/", status_code=302)
-    _set_auth_cookie(response, user.id)
+    if user:
+        # Existing user — log in normally
+        db_gen2 = get_db()
+        db2: Session = next(db_gen2)
+        try:
+            from app.services.users import _post_login
+            _post_login(db2, user)
+        finally:
+            try:
+                next(db_gen2)
+            except StopIteration:
+                pass
+        response = RedirectResponse("/", status_code=302)
+        _set_auth_cookie(response, user.id)
+    else:
+        # New user — ask for invite code
+        from app.security import create_pending_google_token
+        pending_token = create_pending_google_token(
+            google_sub=google_sub, email=email, name=name
+        )
+        import urllib.parse
+        qs = urllib.parse.urlencode({"email": email, "name": name})
+        response = RedirectResponse(f"/google-invite?{qs}", status_code=302)
+        response.set_cookie(
+            key="_google_pending",
+            value=pending_token,
+            httponly=True,
+            samesite="lax",
+            max_age=600,
+        )
+
     response.delete_cookie(_OAUTH_STATE_COOKIE)
     response.delete_cookie(_OAUTH_VERIFIER_COOKIE)
     response.delete_cookie(_OAUTH_REDIRECT_COOKIE)

@@ -1,7 +1,9 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from pydantic import BaseModel
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -12,10 +14,10 @@ from app.models import InviteCode, User
 from sqlalchemy import select as sa_select
 from app.schemas.auth import LoginRequest, RegisterRequest, Token
 from app.schemas.user import UserCreate, UserRead
-from app.security import create_access_token
+from app.security import create_access_token, decode_pending_google_token
 from app.services.exceptions import ConflictError, ValidationError
 from app.services.invite_codes import any_users_exist, validate_and_use_invite_code
-from app.services.users import authenticate_user, create_user
+from app.services.users import authenticate_user, create_user, create_google_user_from_invite
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -99,6 +101,52 @@ def register(payload: RegisterRequest, response: Response, db: Annotated[Session
         samesite="lax",
         max_age=settings.access_token_expire_minutes * 60,
     )
+    return UserRead.model_validate(user)
+
+
+class GoogleCompleteRequest(BaseModel):
+    invite_code: str
+
+
+@router.post("/google-complete", response_model=UserRead)
+def google_complete(
+    payload: GoogleCompleteRequest,
+    request: Request,
+    response: Response,
+    db: Annotated[Session, Depends(get_db)],
+) -> UserRead:
+    """Completa el registro de un usuario nuevo de Google usando un código de invitación."""
+    pending_token = request.cookies.get("_google_pending")
+    if not pending_token:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No hay sesión de Google pendiente. Inicia sesión con Google de nuevo.")
+
+    try:
+        google_info = decode_pending_google_token(pending_token)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
+    try:
+        user = create_google_user_from_invite(
+            db,
+            google_sub=google_info["sub"],
+            email=google_info.get("email") or None,
+            name=google_info.get("name", ""),
+            invite_code=payload.invite_code,
+        )
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except ConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
+    token = create_access_token(user.id, expires_delta=timedelta(minutes=settings.access_token_expire_minutes))
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        httponly=True,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+    )
+    response.delete_cookie("_google_pending")
     return UserRead.model_validate(user)
 
 

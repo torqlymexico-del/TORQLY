@@ -33,3 +33,28 @@ def decode_access_token(token: str) -> dict[str, Any]:
     except JWTError as exc:
         raise ValueError("Token inválido o expirado.") from exc
 
+
+_PENDING_GOOGLE_TYPE = "google_pending"
+
+
+def create_pending_google_token(*, google_sub: str, email: str, name: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=10)
+    payload = {
+        "type": _PENDING_GOOGLE_TYPE,
+        "sub": google_sub,
+        "email": email,
+        "name": name,
+        "exp": expire,
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+
+
+def decode_pending_google_token(token: str) -> dict[str, Any]:
+    try:
+        data = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+        if data.get("type") != _PENDING_GOOGLE_TYPE:
+            raise ValueError("Token inválido.")
+        return data
+    except JWTError as exc:
+        raise ValueError("Sesión de Google expirada o inválida.") from exc
+

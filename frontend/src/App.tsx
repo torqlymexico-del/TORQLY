@@ -18,6 +18,7 @@ import Orders from "@/pages/Orders";
 import CashSessions from "@/pages/CashSessions";
 import Credits from "@/pages/Credits";
 import Accounting from "@/pages/Accounting";
+import GoogleInvite from "@/pages/GoogleInvite";
 import Payroll from "@/pages/Payroll";
 import ServiceEntry from "@/pages/ServiceEntry";
 import Team from "@/pages/Team";
@@ -55,6 +56,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login"         element={<PublicOnly><Login /></PublicOnly>} />
+          <Route path="/google-invite" element={<GoogleInvite />} />
           <Route path="/accept-policy" element={<AcceptPolicy />} />
 
           {/* ── Local branch ── */}
